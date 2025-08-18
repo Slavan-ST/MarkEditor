@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ZPLEditor.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="ZPLEditor.Views.MainView"
+             x:DataType="vm:MainViewModel">
+
+	<Grid ColumnDefinitions="*, 300">
+		<!-- Область редактирования этикетки -->
+		<Border Grid.Column="0" Margin="10" BorderBrush="Gray" BorderThickness="1">
+			<Canvas Name="LabelCanvas" 
+					Background="White" 
+					PointerPressed="Canvas_PointerPressed"
+					DragDrop.AllowDrop="True" />
+		</Border>
+
+		<!-- Панель управления справа -->
+		<StackPanel Grid.Column="1" Margin="10">
+			<Button Content="Add Text" Command="{Binding AddTextCommand}" Height="40" Margin="0,0,0,10"/>
+			<Button Content="Add Image" Command="{Binding AddImageCommand}" Height="40" Margin="0,0,0,10"/>
+			
+			
+			<Button Content="Generate ZPL" Command="{Binding GenerateZplCommand}" Height="40" Margin="0,0,0,10"/>
+			<TextBlock Text="ZPL Output:" Margin="0,0,0,5"/>
+			
+			
+			<TextBox Text="{Binding ZplOutput, Mode=TwoWay}"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     Height="300"/>
+		</StackPanel>
+	</Grid>
+	
+</UserControl>
