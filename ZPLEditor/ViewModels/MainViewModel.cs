@@ -24,56 +24,90 @@ using ZPLEditor.Views;
 
 namespace ZPLEditor.ViewModels;
 
+/// <summary>
+/// Основная ViewModel для редактора ZPL-этикеток.
+/// Управляет элементами на холсте, генерацией ZPL и взаимодействием с пользователем.
+/// </summary>
 public class MainViewModel : ViewModelBase
 {
-
     private readonly MainView _mainWindow;
 
-    // Список редактируемых элементов на холсте
+    // --- Данные и состояние ---
+
+    /// <summary>
+    /// Список всех элементов, отображаемых на холсте (текст, изображения и т.д.).
+    /// </summary>
     private readonly List<LabelElement> _labelElements = new();
 
-    // Активный элемент для перетаскивания
+    /// <summary>
+    /// Текущий элемент, который перетаскивается.
+    /// </summary>
     private Control _draggedElement;
+
+    /// <summary>
+    /// Начальная точка перетаскивания.
+    /// </summary>
     private Point _startPoint;
 
-    // Команды
-    public ReactiveCommand<Unit, Unit> AddTextCommand { get; }
-    public ReactiveCommand<Unit, Unit> AddImageCommand { get; }
-    public ReactiveCommand<Unit, Unit> GenerateZplCommand { get; }
+    // --- Свойства представления ---
 
-    // Свойства представления
+    /// <summary>
+    /// Сгенерированный ZPL-код для отображения.
+    /// </summary>
     [Reactive] public string ZplOutput { get; set; } = "";
 
-    // Конструктор
+    // --- Команды ---
+
+    /// <summary>
+    /// Команда добавления текстового элемента.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> AddTextCommand { get; }
+
+    /// <summary>
+    /// Команда добавления изображения.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> AddImageCommand { get; }
+
+    /// <summary>
+    /// Команда генерации ZPL-кода.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> GenerateZplCommand { get; }
+
+    // --- Конструктор ---
+
+    /// <summary>
+    /// Инициализирует новый экземпляр <see cref="MainViewModel"/>.
+    /// </summary>
+    /// <param name="mainWindow">Ссылка на основное окно для доступа к элементам UI.</param>
     public MainViewModel(MainView mainWindow)
     {
         _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
 
+        // Инициализация команд
         AddTextCommand = ReactiveCommand.Create(AddTextBox);
         AddImageCommand = ReactiveCommand.Create(AddImage);
         GenerateZplCommand = ReactiveCommand.Create(() =>
         {
             string zpl = ZPLUtils.GenerateZplFromControls(_labelElements);
-            //ZPLUtils.PrintZPL(zpl);
+            // ZPLUtils.PrintZPL(zpl); // Раскомментировать для печати
         });
 
-
-        // Подписываемся только на события холста
+        // Подписка на события холста
         _mainWindow.LabelCanvas.AddHandler(
             InputElement.PointerPressedEvent,
             Canvas_PointerPressed,
             RoutingStrategies.Tunnel);
 
-
         _mainWindow.LabelCanvas.PointerMoved += HandlePointerMoved;
         _mainWindow.LabelCanvas.PointerReleased += HandlePointerReleased;
     }
 
-    #region Работа с элементами на холсте
+    // --- Работа с элементами на холсте ---
 
+    #region Добавление элементов
 
     /// <summary>
-    /// Добавляет новый редактируемый текстовый элемент (TextBox) на холст.
+    /// Добавляет текстовое поле на холст.
     /// </summary>
     private void AddTextBox()
     {
@@ -90,7 +124,7 @@ public class MainViewModel : ViewModelBase
         Canvas.SetLeft(textBox, 50);
         Canvas.SetTop(textBox, 50);
 
-        // События
+        // Обработчики событий
         textBox.DoubleTapped += (s, e) =>
         {
             textBox.Focus();
@@ -99,28 +133,22 @@ public class MainViewModel : ViewModelBase
 
         textBox.GotFocus += (s, e) =>
         {
-            // Если элемент был в процессе перетаскивания — отменяем
             if (_draggedElement == textBox)
-            {
                 _draggedElement = null;
-            }
         };
 
-        var element = new LabelElement()
+        var element = new LabelElement
         {
             Name = textBox.Name ?? textBox.Text,
             Control = textBox
         };
-        // Сохраняем ссылку
-        _labelElements.Add(element);
 
-        // Добавляем на холст
+        _labelElements.Add(element);
         _mainWindow.LabelCanvas.Children.Add(textBox);
     }
 
-
     /// <summary>
-    /// Добавляет новый редактируемый текстовый элемент (TextBox) на холст.
+    /// Асинхронно добавляет изображение на холст через диалог выбора файла.
     /// </summary>
     private async void AddImage()
     {
@@ -128,103 +156,108 @@ public class MainViewModel : ViewModelBase
         {
             Title = "Выберите изображение",
             Filters = new List<FileDialogFilter>
-        {
-            new() { Name = "Изображения", Extensions = { "png", "jpg", "jpeg", "bmp", "gif" } },
-            new() { Name = "Все файлы", Extensions = { "*" } }
-        },
+            {
+                new() { Name = "Изображения", Extensions = { "png", "jpg", "jpeg", "bmp", "gif" } },
+                new() { Name = "Все файлы", Extensions = { "*" } }
+            },
             AllowMultiple = false
         };
+
         var window = (Window)_mainWindow.GetVisualRoot();
         var result = await dialog.ShowAsync(window);
+
         if (result == null || result.Length == 0) return;
 
         var filePath = result[0];
+
         try
         {
             var bitmap = new Bitmap(filePath);
-            var element = new LabelElement();
-            var fileName = Path.GetFileNameWithoutExtension(filePath);
-            element.Name = string.IsNullOrEmpty(fileName) ? "IMG1" : fileName;
-
-            element.Data = File.ReadAllBytes(filePath);
+            var fileName = Path.GetFileNameWithoutExtension(filePath) ?? "IMG1";
 
             var imageControl = new Image
             {
                 Source = bitmap,
                 Width = bitmap.PixelSize.Width,
                 Height = bitmap.PixelSize.Height,
-                Stretch = Stretch.None, // Чтобы не растягивалось
-                IsHitTestVisible = true // Чтобы можно было кликать и перетаскивать
+                Stretch = Stretch.None,
+                IsHitTestVisible = true
             };
 
-            // Начальная позиция
             Canvas.SetLeft(imageControl, 50);
             Canvas.SetTop(imageControl, 50);
 
-            element.Control = imageControl;
-            // Добавляем в список элементов
-            _labelElements.Add(element);
+            var element = new LabelElement
+            {
+                Name = fileName,
+                Data = File.ReadAllBytes(filePath),
+                Control = imageControl
+            };
 
-            // Добавляем на холст
+            _labelElements.Add(element);
             _mainWindow.LabelCanvas.Children.Add(imageControl);
         }
         catch (Exception ex)
         {
-            // Можно показать MessageBox, но здесь просто лог
             Debug.WriteLine($"Ошибка загрузки изображения: {ex.Message}");
         }
     }
 
+    #endregion
+
+    #region Обработка перетаскивания элементов
 
     /// <summary>
-    /// Обработка нажатия на холст — определяем, по какому элементу кликнули.
+    /// Обработчик нажатия на холст — определяет, по какому элементу кликнули.
     /// </summary>
     private void Canvas_PointerPressed(object sender, PointerPressedEventArgs e)
     {
         var pos = e.GetPosition(_mainWindow.LabelCanvas);
-        var hitControl = _mainWindow.LabelCanvas.InputHitTest(pos) as Avalonia.Controls.Control;
+        var hitControl = _mainWindow.LabelCanvas.InputHitTest(pos) as Control;
 
-        Control actualElement = null;
-        var parent = hitControl;
-        while (parent != null)
+        Control actualElement = FindParentControlInCanvas(hitControl);
+
+        if (actualElement == null) return;
+
+        var properties = e.GetCurrentPoint(_mainWindow.LabelCanvas).Properties;
+
+        if (properties.IsLeftButtonPressed)
         {
-            var control = parent as Control;
-
-            if (_mainWindow.LabelCanvas.Children.Contains(control))
+            if (e.ClickCount == 1)
             {
-                actualElement = parent as Control;
-                break;
+                _draggedElement = actualElement;
+                _startPoint = pos;
+                e.Pointer.Capture(_mainWindow.LabelCanvas);
+                e.Handled = true;
             }
-            parent = (Control)parent.Parent;
-        }
-
-        if (actualElement != null)
-        {
-            var properties = e.GetCurrentPoint(_mainWindow.LabelCanvas).Properties;
-
-            if (properties.IsLeftButtonPressed)
+            else if (e.ClickCount == 2)
             {
-                if (e.ClickCount == 1)
-                {
-                    _draggedElement = actualElement;
-                    _startPoint = pos;
-                    e.Pointer.Capture(_mainWindow.LabelCanvas);
-                    e.Handled = true;
-                }
-                else if (e.ClickCount == 2)
-                {
-                    if (actualElement is TextBox tb)
-                    {
-                        tb.Focus();
-                    }
-                    e.Handled = true;
-                }
+                if (actualElement is TextBox tb)
+                    tb.Focus();
+                e.Handled = true;
             }
         }
     }
 
     /// <summary>
-    /// Обработка движения мыши при зажатой кнопке.
+    /// Находит ближайший родительский Control, который является прямым дочерним элементом холста.
+    /// </summary>
+    /// <param name="start">Начальный элемент для поиска.</param>
+    /// <returns>Найденный элемент или null.</returns>
+    private Control FindParentControlInCanvas(Control start)
+    {
+        var current = start;
+        while (current != null)
+        {
+            if (_mainWindow.LabelCanvas.Children.Contains(current))
+                return current;
+            current = current.Parent as Control;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Обработка движения мыши при перетаскивании.
     /// </summary>
     private void HandlePointerMoved(object sender, PointerEventArgs e)
     {
@@ -236,9 +269,6 @@ public class MainViewModel : ViewModelBase
         var left = Canvas.GetLeft(_draggedElement) + delta.X;
         var top = Canvas.GetTop(_draggedElement) + delta.Y;
 
-        //left = Math.Max(0, left);
-        //top = Math.Max(0, top);
-
         Canvas.SetLeft(_draggedElement, left);
         Canvas.SetTop(_draggedElement, top);
 
@@ -246,7 +276,7 @@ public class MainViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Завершение перетаскивания.
+    /// Завершение перетаскивания — освобождение захвата указателя.
     /// </summary>
     private void HandlePointerReleased(object sender, PointerReleasedEventArgs e)
     {
@@ -255,5 +285,4 @@ public class MainViewModel : ViewModelBase
     }
 
     #endregion
-
 }
