@@ -32,7 +32,6 @@ public class ElementViewModel : ReactiveObject
         set
         {
             this.RaiseAndSetIfChanged(ref _name, value);
-            Control.Name = value; // Обновляем имя Control (опционально)
         }
     }
 

@@ -34,7 +34,8 @@ public class MainViewModel : ViewModelBase
 
     // --- Данные и состояние ---
 
-    [Reactive] public ObservableCollection<ElementViewModel> Elements { get; set; } = new();
+    [Reactive] public List<ElementViewModel> Elements { get; set; } = new();
+    [Reactive] public ElementViewModel CurrentElement { get; set; }
 
     /// <summary>
     /// Текущий элемент, который перетаскивается.
@@ -75,6 +76,11 @@ public class MainViewModel : ViewModelBase
     {
         _mainWindow.LabelCanvas.Children.Remove(element.Control);
         Elements.Remove(element);
+
+        if (CurrentElement == element)
+        {
+            CurrentElement = null;
+        }
     }
     // --- Конструктор ---
 
@@ -93,6 +99,7 @@ public class MainViewModel : ViewModelBase
         {
             string zpl = ZPLUtils.GenerateZplFromControls(Elements);
             // ZPLUtils.PrintZPL(zpl); // Раскомментировать для печати
+            ZplOutput = zpl;
         });
         RemoveElementCommand = ReactiveCommand.Create<ElementViewModel>(RemoveElement);
 
@@ -144,6 +151,7 @@ public class MainViewModel : ViewModelBase
         Elements.Add(elementVm);
 
         _mainWindow.LabelCanvas.Children.Add(textBox);
+        CurrentElement = elementVm;
     }
 
     /// <summary>
@@ -179,7 +187,7 @@ public class MainViewModel : ViewModelBase
                 Source = bitmap,
                 Width = bitmap.PixelSize.Width,
                 Height = bitmap.PixelSize.Height,
-                Stretch = Stretch.None,
+                Stretch = Stretch.Fill,
                 IsHitTestVisible = true
             };
 
@@ -191,6 +199,7 @@ public class MainViewModel : ViewModelBase
             Elements.Add(elementVm);
 
             _mainWindow.LabelCanvas.Children.Add(imageControl);
+            CurrentElement = elementVm;
         }
         catch (Exception ex)
         {
@@ -224,12 +233,26 @@ public class MainViewModel : ViewModelBase
                 _startPoint = pos;
                 e.Pointer.Capture(_mainWindow.LabelCanvas);
                 e.Handled = true;
+
+                // Устанавливаем текущий элемент при клике
+                var vm = Elements.FirstOrDefault(x => x.Control == actualElement);
+                if (vm != null)
+                {
+                    CurrentElement = vm;
+                }
             }
             else if (e.ClickCount == 2)
             {
                 if (actualElement is TextBox tb)
                     tb.Focus();
                 e.Handled = true;
+
+                // Двойной клик — тоже делаем элемент текущим
+                var vm = Elements.FirstOrDefault(x => x.Control == actualElement);
+                if (vm != null)
+                {
+                    CurrentElement = vm;
+                }
             }
         }
     }

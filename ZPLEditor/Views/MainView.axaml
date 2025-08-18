@@ -3,20 +3,24 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:ZPLEditor.ViewModels"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             mc:Ignorable="d"
+             d:DesignWidth="800" d:DesignHeight="450"
              x:Class="ZPLEditor.Views.MainView"
-             x:DataType="vm:MainViewModel">
+             x:DataType="vm:MainViewModel"
+             x:Name="mainWindow">
 
 	<Grid ColumnDefinitions="*, 300">
-		<!-- Область редактирования этикетки -->
+		<!-- Область редактирования -->
 		<Border Grid.Column="0" Margin="10" BorderBrush="Gray" BorderThickness="1">
 			<Canvas Name="LabelCanvas"
-					Background="White"
-					PointerPressed="Canvas_PointerPressed"
-					DragDrop.AllowDrop="True" />
+                    Background="White"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    PointerPressed="Canvas_PointerPressed"
+                    DragDrop.AllowDrop="True" />
 		</Border>
 
-		<!-- Панель управления справа -->
+		<!-- Панель управления -->
 		<StackPanel Grid.Column="1" Margin="10">
 			<Button Content="Add Text" Command="{Binding AddTextCommand}" Height="40" Margin="0,0,0,10"/>
 			<Button Content="Add Image" Command="{Binding AddImageCommand}" Height="40" Margin="0,0,0,10"/>
@@ -24,31 +28,41 @@
 
 			<TextBlock Text="Elements:" FontWeight="SemiBold" Margin="0,10,0,5"/>
 
-			<DataGrid ItemsSource="{Binding Elements}" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10">
-				<DataGrid.Columns>
-					<DataGridTextColumn Header="Name" Binding="{Binding Name, Mode=TwoWay}" Width="*" />
-					<DataGridTextColumn Header="X" Binding="{Binding X, Mode=TwoWay}" Width="50" />
-					<DataGridTextColumn Header="Y" Binding="{Binding Y, Mode=TwoWay}" Width="50" />
-					<DataGridTextColumn Header="Width" Binding="{Binding Width, Mode=TwoWay}" Width="60" />
-					<DataGridTextColumn Header="Height" Binding="{Binding Height, Mode=TwoWay}" Width="60" />
-					<DataGridTemplateColumn Header="Action" Width="60">
-						<DataGridTemplateColumn.CellTemplate>
-							<DataTemplate>
-								<Button Content="🗑️"
-                                        Command="{Binding $DataContext.RemoveElementCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                        CommandParameter="{Binding}"
-                                        Width="30" Height="30"/>
-							</DataTemplate>
-						</DataGridTemplateColumn.CellTemplate>
-					</DataGridTemplateColumn>
-				</DataGrid.Columns>
-			</DataGrid>
+			<StackPanel Margin="0,0,0,10">
+				<TextBlock Text="Selected Element:" FontWeight="SemiBold" Margin="0,0,0,5"/>
 
-			<TextBlock Text="ZPL Output:" Margin="0,0,0,5"/>
-			<TextBox Text="{Binding ZplOutput, Mode=TwoWay}"
-                     AcceptsReturn="True"
-                     TextWrapping="Wrap"
-                     Height="200"/>
+				<StackPanel Margin="0,0,0,10">
+					<TextBlock Text="Selected Element:" FontWeight="SemiBold" Margin="0,0,0,5"/>
+
+					<!-- Панель видима только если CurrentElement не null -->
+					<StackPanel IsVisible="{Binding CurrentElement}">
+						<!-- Строка: Name -->
+						<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+							<TextBlock Text="Name:" Width="60" VerticalAlignment="Center"/>
+							<TextBox Text="{Binding CurrentElement.Name, Mode=TwoWay}" Margin="2,0" HorizontalAlignment="Stretch"/>
+						</StackPanel>
+
+						<!-- Строка: X и Y -->
+						<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+							<TextBlock Text="X:" Width="60" VerticalAlignment="Center"/>
+							<TextBox Text="{Binding CurrentElement.X, Mode=TwoWay}" Margin="2,0" Width="50"/>
+
+							<TextBlock Text="Y:" Width="60" Margin="10,0,0,0" VerticalAlignment="Center"/>
+							<TextBox Text="{Binding CurrentElement.Y, Mode=TwoWay}" Margin="2,0" Width="50"/>
+						</StackPanel>
+
+						<!-- Строка: Width и Height -->
+						<StackPanel Orientation="Horizontal" Margin="0,5,0,2">
+							<TextBlock Text="Width:" Width="60" VerticalAlignment="Center"/>
+							<TextBox Text="{Binding CurrentElement.Width, Mode=TwoWay}" Margin="2,0" Width="50"/>
+
+							<TextBlock Text="Height:" Width="60" Margin="10,0,0,0" VerticalAlignment="Center"/>
+							<TextBox Text="{Binding CurrentElement.Height, Mode=TwoWay}" Margin="2,0" Width="50"/>
+						</StackPanel>
+					</StackPanel>
+				</StackPanel>
+			</StackPanel>
+
 		</StackPanel>
 	</Grid>
 </UserControl>
