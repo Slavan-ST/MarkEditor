@@ -12,13 +12,13 @@ using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Reactive;
 using System.Xml.Linq;
-using ZPLEditor.Models;
 using ZPLEditor.Utils;
 using ZPLEditor.Views;
 
@@ -34,10 +34,7 @@ public class MainViewModel : ViewModelBase
 
     // --- Данные и состояние ---
 
-    /// <summary>
-    /// Список всех элементов, отображаемых на холсте (текст, изображения и т.д.).
-    /// </summary>
-    private readonly List<LabelElement> _labelElements = new();
+    [Reactive] public ObservableCollection<ElementViewModel> Elements { get; set; } = new();
 
     /// <summary>
     /// Текущий элемент, который перетаскивается.
@@ -72,7 +69,13 @@ public class MainViewModel : ViewModelBase
     /// Команда генерации ZPL-кода.
     /// </summary>
     public ReactiveCommand<Unit, Unit> GenerateZplCommand { get; }
+    public ReactiveCommand<ElementViewModel, Unit> RemoveElementCommand { get; }
 
+    private void RemoveElement(ElementViewModel element)
+    {
+        _mainWindow.LabelCanvas.Children.Remove(element.Control);
+        Elements.Remove(element);
+    }
     // --- Конструктор ---
 
     /// <summary>
@@ -88,9 +91,10 @@ public class MainViewModel : ViewModelBase
         AddImageCommand = ReactiveCommand.Create(AddImage);
         GenerateZplCommand = ReactiveCommand.Create(() =>
         {
-            string zpl = ZPLUtils.GenerateZplFromControls(_labelElements);
+            string zpl = ZPLUtils.GenerateZplFromControls(Elements);
             // ZPLUtils.PrintZPL(zpl); // Раскомментировать для печати
         });
+        RemoveElementCommand = ReactiveCommand.Create<ElementViewModel>(RemoveElement);
 
         // Подписка на события холста
         _mainWindow.LabelCanvas.AddHandler(
@@ -124,7 +128,6 @@ public class MainViewModel : ViewModelBase
         Canvas.SetLeft(textBox, 50);
         Canvas.SetTop(textBox, 50);
 
-        // Обработчики событий
         textBox.DoubleTapped += (s, e) =>
         {
             textBox.Focus();
@@ -137,13 +140,9 @@ public class MainViewModel : ViewModelBase
                 _draggedElement = null;
         };
 
-        var element = new LabelElement
-        {
-            Name = textBox.Name ?? textBox.Text,
-            Control = textBox
-        };
+        var elementVm = new ElementViewModel(textBox, "Text", 50, 50, 120, 30);
+        Elements.Add(elementVm);
 
-        _labelElements.Add(element);
         _mainWindow.LabelCanvas.Children.Add(textBox);
     }
 
@@ -156,10 +155,10 @@ public class MainViewModel : ViewModelBase
         {
             Title = "Выберите изображение",
             Filters = new List<FileDialogFilter>
-            {
-                new() { Name = "Изображения", Extensions = { "png", "jpg", "jpeg", "bmp", "gif" } },
-                new() { Name = "Все файлы", Extensions = { "*" } }
-            },
+        {
+            new() { Name = "Изображения", Extensions = { "png", "jpg", "jpeg", "bmp", "gif" } },
+            new() { Name = "Все файлы", Extensions = { "*" } }
+        },
             AllowMultiple = false
         };
 
@@ -187,14 +186,10 @@ public class MainViewModel : ViewModelBase
             Canvas.SetLeft(imageControl, 50);
             Canvas.SetTop(imageControl, 50);
 
-            var element = new LabelElement
-            {
-                Name = fileName,
-                Data = File.ReadAllBytes(filePath),
-                Control = imageControl
-            };
+            var data = File.ReadAllBytes(filePath);
+            var elementVm = new ElementViewModel(imageControl, fileName, 50, 50, bitmap.PixelSize.Width, bitmap.PixelSize.Height, data);
+            Elements.Add(elementVm);
 
-            _labelElements.Add(element);
             _mainWindow.LabelCanvas.Children.Add(imageControl);
         }
         catch (Exception ex)
@@ -271,6 +266,14 @@ public class MainViewModel : ViewModelBase
 
         Canvas.SetLeft(_draggedElement, left);
         Canvas.SetTop(_draggedElement, top);
+
+        // Найдём соответствующий ElementViewModel и обновим его
+        var vm = Elements.FirstOrDefault(x => x.Control == _draggedElement);
+        if (vm != null)
+        {
+            vm.X = left;
+            vm.Y = top;
+        }
 
         _startPoint = pos;
     }

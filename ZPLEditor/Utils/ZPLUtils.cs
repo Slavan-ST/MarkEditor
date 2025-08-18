@@ -8,7 +8,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
-using ZPLEditor.Models;
+using ZPLEditor.ViewModels;
 
 namespace ZPLEditor.Utils
 {
@@ -30,7 +30,7 @@ namespace ZPLEditor.Utils
         /// </summary>
         /// <param name="controls">Список элементов метки (с привязкой к UI-контролам)</param>
         /// <returns>Сгенерированный ZPL-код как строка</returns>
-        public static string GenerateZplFromControls(IEnumerable<LabelElement> controls)
+        public static string GenerateZplFromControls(IEnumerable<ElementViewModel> controls)
         {
             if (controls == null)
                 throw new ArgumentNullException(nameof(controls));
@@ -67,17 +67,17 @@ namespace ZPLEditor.Utils
             return BuildZplString(zplElements);
         }
 
-        private static void ProcessTextBox(TextBox textBox, LabelElement element, List<ZplElementBase> zplElements)
+        private static void ProcessTextBox(TextBox textBox, ElementViewModel element, List<ZplElementBase> zplElements)
         {
             AddTextElement(textBox.Text, element, zplElements);
         }
 
-        private static void ProcessTextBlock(TextBlock textBlock, LabelElement element, List<ZplElementBase> zplElements)
+        private static void ProcessTextBlock(TextBlock textBlock, ElementViewModel element, List<ZplElementBase> zplElements)
         {
             AddTextElement(textBlock.Text, element, zplElements);
         }
 
-        private static void AddTextElement(string text, LabelElement element, List<ZplElementBase> zplElements)
+        private static void AddTextElement(string text, ElementViewModel element, List<ZplElementBase> zplElements)
         {
             var x = (int)Canvas.GetLeft(element.Control);
             var y = (int)Canvas.GetTop(element.Control);
@@ -86,7 +86,7 @@ namespace ZPLEditor.Utils
             zplElements.Add(new ZplTextField(text, x, y, font));
         }
 
-        private static void ProcessImage(Image image, LabelElement element, List<ZplElementBase> zplElements)
+        private static void ProcessImage(Image image, ElementViewModel element, List<ZplElementBase> zplElements)
         {
             var x = (int)Canvas.GetLeft(image);
             var y = (int)Canvas.GetTop(image);
