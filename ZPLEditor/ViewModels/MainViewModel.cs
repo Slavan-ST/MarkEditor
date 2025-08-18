@@ -14,9 +14,12 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Reactive;
 using System.Xml.Linq;
+using ZPLEditor.Models;
+using ZPLEditor.Utils;
 using ZPLEditor.Views;
 
 namespace ZPLEditor.ViewModels;
@@ -24,17 +27,10 @@ namespace ZPLEditor.ViewModels;
 public class MainViewModel : ViewModelBase
 {
 
-    byte[] imageBytes = null;
-
-    // Теперь у вас есть и bitmap, и исходные байты
-
-
-
-
     private readonly MainView _mainWindow;
 
     // Список редактируемых элементов на холсте
-    private readonly List<Control> _labelElements = new();
+    private readonly List<LabelElement> _labelElements = new();
 
     // Активный элемент для перетаскивания
     private Control _draggedElement;
@@ -55,7 +51,12 @@ public class MainViewModel : ViewModelBase
 
         AddTextCommand = ReactiveCommand.Create(AddTextBox);
         AddImageCommand = ReactiveCommand.Create(AddImage);
-        GenerateZplCommand = ReactiveCommand.Create(GenerateZpl);
+        GenerateZplCommand = ReactiveCommand.Create(() =>
+        {
+            string zpl = ZPLUtils.GenerateZplFromControls(_labelElements);
+            //ZPLUtils.PrintZPL(zpl);
+        });
+
 
         // Подписываемся только на события холста
         _mainWindow.LabelCanvas.AddHandler(
@@ -105,8 +106,13 @@ public class MainViewModel : ViewModelBase
             }
         };
 
+        var element = new LabelElement()
+        {
+            Name = textBox.Name ?? textBox.Text,
+            Control = textBox
+        };
         // Сохраняем ссылку
-        _labelElements.Add(textBox);
+        _labelElements.Add(element);
 
         // Добавляем на холст
         _mainWindow.LabelCanvas.Children.Add(textBox);
@@ -136,8 +142,11 @@ public class MainViewModel : ViewModelBase
         try
         {
             var bitmap = new Bitmap(filePath);
+            var element = new LabelElement();
+            var fileName = Path.GetFileNameWithoutExtension(filePath);
+            element.Name = string.IsNullOrEmpty(fileName) ? "IMG1" : fileName;
 
-            imageBytes = File.ReadAllBytes(filePath);
+            element.Data = File.ReadAllBytes(filePath);
 
             var imageControl = new Image
             {
@@ -152,9 +161,9 @@ public class MainViewModel : ViewModelBase
             Canvas.SetLeft(imageControl, 50);
             Canvas.SetTop(imageControl, 50);
 
-
+            element.Control = imageControl;
             // Добавляем в список элементов
-            _labelElements.Add(imageControl);
+            _labelElements.Add(element);
 
             // Добавляем на холст
             _mainWindow.LabelCanvas.Children.Add(imageControl);
@@ -179,7 +188,9 @@ public class MainViewModel : ViewModelBase
         var parent = hitControl;
         while (parent != null)
         {
-            if (_labelElements.Contains(parent as Control))
+            var control = parent as Control;
+
+            if (_mainWindow.LabelCanvas.Children.Contains(control))
             {
                 actualElement = parent as Control;
                 break;
@@ -245,118 +256,4 @@ public class MainViewModel : ViewModelBase
 
     #endregion
 
-    #region Генерация ZPL
-
-    /// <summary>
-    /// Генерирует ZPL-код на основе элементов на холсте и отправляет на принтер.
-    /// </summary>
-    private void GenerateZpl()
-    {
-        var zplElements = new List<ZplElementBase>();
-
-        foreach (var child in _mainWindow.LabelCanvas.Children)
-        {
-            if (child is TextBox tb)
-            {
-                var x = (int)Canvas.GetLeft(tb);
-                var y = (int)Canvas.GetTop(tb);
-                var font = new ZplFont(fontWidth: 50, fontHeight: 50);
-                zplElements.Add(new ZplTextField(tb.Text, x, y, font));
-            }
-            else if (child is TextBlock tl)
-            {
-                var x = (int)Canvas.GetLeft(tl);
-                var y = (int)Canvas.GetTop(tl);
-                var font = new ZplFont(fontWidth: 50, fontHeight: 50);
-                zplElements.Add(new ZplTextField(tl.Text, x, y, font));
-            }
-            else if (child is Image img && img.Source is Bitmap bitmap)
-            {
-                var x = (int)Canvas.GetLeft(img);
-                var y = (int)Canvas.GetTop(img);
-
-                try
-                {
-                    zplElements.Add(new ZplDownloadGraphics('R', "SAMPLE", imageBytes));
-                    zplElements.Add(new ZplRecallGraphic(x, y, 'R', "SAMPLE"));
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Ошибка конвертации изображения: {ex.Message}");
-                }
-            }
-        }
-
-        var engine = new ZplEngine(zplElements);
-        var options = new ZplRenderOptions { AddEmptyLineBeforeElementStart = true, TargetPrintDpi = 304, SourcePrintDpi = 304 };
-        ZplOutput = engine.ToZplString(options);
-
-        Debug.WriteLine(engine.ToZplString(options));
-
-        PrintZPL();
-
-
-    }
-
-
-    /// <summary>
-    /// Отправляет ZPL-код на принтер по TCP.
-    /// </summary>
-    private void PrintZPL()
-    {
-        const string printerIp = "192.168.10.202";
-        const int printerPort = 9100;
-
-        try
-        {
-            using var client = new TcpClient(printerIp, printerPort);
-            using var stream = client.GetStream();
-            using var writer = new StreamWriter(stream) { AutoFlush = true };
-            writer.Write(ZplOutput);
-            Debug.WriteLine("ZPL отправлен на принтер.");
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Ошибка печати: {ex.Message}");
-        }
-    }
-    /// <summary>
-    /// Конвертирует Bitmap в монохромную hex-строку для ZPL (формат ^GF).
-    /// </summary>
-    private string BitmapToZplHex(Bitmap bitmap)
-    {
-        using var memory = new MemoryStream();
-        bitmap.Save(memory);
-        memory.Position = 0;
-
-        using var bmp = new System.Drawing.Bitmap(memory);
-        int width = bmp.Width;
-        int height = bmp.Height;
-        int byteWidth = (width + 7) / 8;
-        var bytes = new byte[byteWidth * height];
-
-        for (int y = 0; y < height; y++)
-        {
-            for (int xByte = 0; xByte < byteWidth; xByte++)
-            {
-                byte b = 0;
-                for (int bit = 0; bit < 8; bit++)
-                {
-                    int x = xByte * 8 + bit;
-                    if (x >= width) break;
-                    var pixel = bmp.GetPixel(x, y);
-                    int brightness = (pixel.R + pixel.G + pixel.B) / 3;
-                    if (brightness < 128)
-                    {
-                        b |= (byte)(0x80 >> bit);
-                    }
-                }
-                bytes[y * byteWidth + xByte] = b;
-            }
-        }
-
-        return BitConverter.ToString(bytes).Replace("-", "");
-    }
-
-    #endregion
 }
