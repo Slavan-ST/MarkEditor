@@ -1,93 +1,143 @@
 ﻿// File: ElementViewModel.cs
-using ReactiveUI;
+using Avalonia;
 using Avalonia.Controls;
+using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
+using System;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
 
 namespace ZPLEditor.ViewModels;
 
-public class ElementViewModel : ReactiveObject
+// Перечисление типов элементов
+public enum ElementType
 {
-    private double _x;
-    private double _y;
-    private double _width;
-    private double _height;
-    private byte[]? _data;
+    Text,
+    Ean13,
+    Ean128,
+    QrCode,
+    Image,
+    DataMatrix
+}
+
+public class ElementViewModel : ReactiveObject, IDisposable
+{
+    private readonly CompositeDisposable _disposables = new();
 
     public Control Control { get; }
 
-    public ElementViewModel(Control control, string name, double x, double y, double width, double height, byte[] data = null)
+    // Конструктор
+    public ElementViewModel(
+        Control control,
+        string name,
+        ElementType type,
+        double x,
+        double y,
+        double width,
+        double height,
+        byte[]? data = null,
+        string content = "",
+        string path = "")
     {
         Control = control;
         Name = name;
-        _x = x;
-        _y = y;
-        _width = width;
-        _height = height;
-        _data = data;
+        Type = type;
+        X = x;
+        Y = y;
+        Width = width;
+        Height = height;
+        Data = data;
+        Content = content;
+        Path = path; // Установим из параметра
+
+        // Устанавливаем начальные значения на контроле
+        Canvas.SetLeft(Control, X);
+        Canvas.SetTop(Control, Y);
+        Control.Width = Width;
+        Control.Height = Height;
+
+        // Подписываемся на изменения свойств контролов
+        this.WhenAnyValue(vm => vm.X)
+            .Subscribe(x => Canvas.SetLeft(Control, x))
+            .DisposeWith(_disposables);
+
+        this.WhenAnyValue(vm => vm.Y)
+            .Subscribe(y => Canvas.SetTop(Control, y))
+            .DisposeWith(_disposables);
+
+        this.WhenAnyValue(vm => vm.Width)
+            .Subscribe(width => Control.Width = width)
+            .DisposeWith(_disposables);
+
+        this.WhenAnyValue(vm => vm.Height)
+            .Subscribe(height => Control.Height = height)
+            .DisposeWith(_disposables);
+
+        // Подписываемся на изменения контролов и обновляем VM
+        Observable
+            .FromEventPattern<EventHandler, EventArgs>(
+                h => Control.LayoutUpdated += h,
+                h => Control.LayoutUpdated -= h)
+            .Subscribe(_ => UpdateFromControl())
+            .DisposeWith(_disposables);
+
+        // Реактивно вычисляем видимость на основе Type
+        this.WhenAnyValue(x => x.Type)
+            .Subscribe(UpdateVisibilityFlags)
+            .DisposeWith(_disposables);
     }
 
-    [Reactive]
-    public string Name { get; set; } = string.Empty;
-    [Reactive]
-    public string Path { get; set; } = string.Empty;
+    [Reactive] public bool IsEditing { get; set; }
+    [Reactive] public string Name { get; set; } = string.Empty;
+    [Reactive] public string Path { get; set; } = string.Empty;
+    [Reactive] public ElementType Type { get; set; }
+    [Reactive] public double X { get; set; }
+    [Reactive] public double Y { get; set; }
+    [Reactive] public double Width { get; set; }
+    [Reactive] public double Height { get; set; }
+    [Reactive] public byte[]? Data { get; set; }
+    [Reactive] public string Content { get; set; } = string.Empty;
 
-    public double X
-    {
-        get => _x;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _x, value);
-            Canvas.SetLeft(Control, value);
-        }
-    }
+    // Свойства видимости (реактивные, но управляются логикой)
+    [Reactive] public bool IsContentVisible { get; set; }
+    [Reactive] public bool IsPathVisible { get; set; }
 
-    public double Y
+    /// <summary>
+    /// Обновляет флаги видимости в зависимости от типа элемента.
+    /// </summary>
+    private void UpdateVisibilityFlags(ElementType type)
     {
-        get => _y;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _y, value);
-            Canvas.SetTop(Control, value);
-        }
-    }
-
-    public double Width
-    {
-        get => _width;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _width, value);
-            Control.Width = value;
-        }
+        IsContentVisible = type != ElementType.Image;
+        IsPathVisible = type == ElementType.Image;
     }
 
-    public double Height
+    /// <summary>
+    /// Обновляет X, Y, Width, Height из текущего состояния Control.
+    /// Вызывается при изменении layout (например, при drag & resize).
+    /// </summary>
+    private void UpdateFromControl()
     {
-        get => _height;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _height, value);
-            Control.Height = value;
-        }
+        var newX = Canvas.GetLeft(Control);
+        var newY = Canvas.GetTop(Control);
+        var newWidth = Control.Width;
+        var newHeight = Control.Height;
+
+        // Обновляем только при изменении, чтобы избежать лишних уведомлений
+        if (!X.Equals(newX)) X = newX;
+        if (!Y.Equals(newY)) Y = newY;
+        if (!Width.Equals(newWidth)) Width = newWidth;
+        if (!Height.Equals(newHeight)) Height = newHeight;
     }
-    public byte[]? Data
+
+    public void UpdateContent(string newContent)
     {
-        get => _data;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _data, value);
-            _data = value;
-        }
+        if (IsEditing) return; // Защита от рекурсии
+        Content = newContent;
     }
-    public void UpdateFromControl()
+
+    // Освобождение подписок
+    public void Dispose()
     {
-        _x = Canvas.GetLeft(Control);
-        _y = Canvas.GetTop(Control);
-        _width = Control.Width;
-        _height = Control.Height;
-        this.RaisePropertyChanged(nameof(X));
-        this.RaisePropertyChanged(nameof(Y));
-        this.RaisePropertyChanged(nameof(Width));
-        this.RaisePropertyChanged(nameof(Height));
+        _disposables?.Dispose();
     }
 }

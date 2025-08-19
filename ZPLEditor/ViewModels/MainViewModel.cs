@@ -18,6 +18,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Reactive;
+using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Xml.Linq;
 using ZPLEditor.Utils;
@@ -160,6 +161,37 @@ public class MainViewModel : ViewModelBase
         Canvas.SetLeft(textBox, 50);
         Canvas.SetTop(textBox, 50);
 
+        var elementVm = new ElementViewModel(textBox, "Text", ElementType.Text, 50, 50, 120, 30)
+        {
+            Content = "Edit Me"
+        };
+        Elements.Add(elementVm);
+
+        _mainWindow.LabelCanvas.Children.Add(textBox);
+        CurrentElement = elementVm;
+
+        // --- Управление редактированием ---
+        void OnTextBoxLostFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox tb && elementVm.IsEditing)
+            {
+                elementVm.IsEditing = false;
+                elementVm.Content = tb.Text; // Сохраняем только здесь
+            }
+        }
+
+        void OnTextBoxKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter || e.Key == Key.Escape)
+            {
+                textBox.LostFocus -= OnTextBoxLostFocus; // Избегаем дублирования
+                textBox.LostFocus += OnTextBoxLostFocus;
+                textBox.Focusable = false; // Снимаем фокус
+                textBox.Focusable = true;
+                elementVm.IsEditing = false;
+            }
+        }
+
         textBox.DoubleTapped += (s, e) =>
         {
             textBox.Focus();
@@ -168,15 +200,22 @@ public class MainViewModel : ViewModelBase
 
         textBox.GotFocus += (s, e) =>
         {
+            elementVm.IsEditing = true;
             if (_draggedElement == textBox)
                 _draggedElement = null;
         };
 
-        var elementVm = new ElementViewModel(textBox, "Text", 50, 50, 120, 30);
-        Elements.Add(elementVm);
+        textBox.LostFocus += OnTextBoxLostFocus;
+        textBox.KeyDown += OnTextBoxKeyDown;
 
-        _mainWindow.LabelCanvas.Children.Add(textBox);
-        CurrentElement = elementVm;
+        // Реактивное обновление Text из Content (только когда VM меняет Content)
+        elementVm.WhenAnyValue(vm => vm.Content)
+            .Where(content => !elementVm.IsEditing)
+            .Subscribe(content =>
+            {
+                if (textBox.Text != content)
+                    textBox.Text = content;
+            });
     }
 
     /// <summary>
@@ -220,7 +259,7 @@ public class MainViewModel : ViewModelBase
             Canvas.SetTop(imageControl, 50);
 
             var data = File.ReadAllBytes(filePath);
-            var elementVm = new ElementViewModel(imageControl, fileName, 50, 50, bitmap.PixelSize.Width, bitmap.PixelSize.Height, data);
+            var elementVm = new ElementViewModel(imageControl, fileName,ElementType.Image, 50, 50, bitmap.PixelSize.Width, bitmap.PixelSize.Height, data);
             Elements.Add(elementVm);
             elementVm.Path = filePath;
 
@@ -237,7 +276,7 @@ public class MainViewModel : ViewModelBase
     {
         var content = $"QR-{LabelName}-{DateTime.Now:HHmmss}";
         var bitmap = BarcodeGenerator.GenerateQrCode(content, 100, 100);
-        AddBarcodeToCanvas(bitmap, "QR", content);
+        AddBarcodeToCanvas(bitmap, "QR", content, ElementType.QrCode);
     }
 
     private void AddEan13()
@@ -251,14 +290,14 @@ public class MainViewModel : ViewModelBase
             baseNum = baseNum.Substring(0, 12); // Обрезаем, если вдруг больше
 
         var bitmap = BarcodeGenerator.GenerateEan13(baseNum, 200, 80);
-        AddBarcodeToCanvas(bitmap, "EAN13", baseNum);
+        AddBarcodeToCanvas(bitmap, "EAN13", baseNum, ElementType.Ean13);
     }
 
     private void AddDataMatrix()
     {
         var content = $"DM-X:{LabelWidth:F0},Y:{LabelHeight:F0}";
         var bitmap = BarcodeGenerator.GenerateDataMatrix(content, 100, 100);
-        AddBarcodeToCanvas(bitmap, "DataMatrix", content);
+        AddBarcodeToCanvas(bitmap, "DataMatrix", content, ElementType.DataMatrix);
     }
 
     private void AddCode128()
@@ -267,11 +306,11 @@ public class MainViewModel : ViewModelBase
         //var content = $"[)>{LabelName}|{DateTime.Now:yyMMdd}|{LabelWidth}x{LabelHeight}";
         var content = $"00046070699704096210";
         var bitmap = BarcodeGenerator.GenerateCode128(content, 200, 80);
-        AddBarcodeToCanvas(bitmap, "Code128", content);
+        AddBarcodeToCanvas(bitmap, "Code128", content, ElementType.Ean128);
     }
 
     // Вспомогательный метод: добавляет баркод как изображение на холст
-    private void AddBarcodeToCanvas(Bitmap bitmap, string typeName, string data)
+    private void AddBarcodeToCanvas(Bitmap bitmap, string typeName, string data, ElementType type)
     {
         var imageControl = new Image
         {
@@ -291,20 +330,55 @@ public class MainViewModel : ViewModelBase
         var elementVm = new ElementViewModel(
             imageControl,
             $"{typeName}_{Elements.Count + 1}",
+            type,
             left, top,
             bitmap.PixelSize.Width,
             bitmap.PixelSize.Height,
-            null // можно хранить байты, если нужно
-        );
-        elementVm.Path = $"Generated:{typeName}='{data}'"; // для отображения в UI
+            null
+        )
+        {
+            Content = data,
+            Path = $"Generated:{typeName}='{data}'"
+        };
 
         Elements.Add(elementVm);
         _mainWindow.LabelCanvas.Children.Add(imageControl);
         CurrentElement = elementVm;
+
+        // --- Реактивная перегенерация баркода при изменении Content ---
+        elementVm.WhenAnyValue(vm => vm.Content)
+            .Where(content => !string.IsNullOrWhiteSpace(content))
+            .Where(_ => !elementVm.IsEditing) // Только если не в процессе редактирования
+            .Throttle(TimeSpan.FromMilliseconds(100)) // Защита от "дребезга"
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(content =>
+            {
+                try
+                {
+                    Bitmap newBitmap = type switch
+                    {
+                        ElementType.QrCode => BarcodeGenerator.GenerateQrCode(content, (int)elementVm.Width, (int)elementVm.Height),
+                        ElementType.Ean13 => BarcodeGenerator.GenerateEan13(content, (int)elementVm.Width, (int)elementVm.Height),
+                        ElementType.DataMatrix => BarcodeGenerator.GenerateDataMatrix(content, (int)elementVm.Width, (int)elementVm.Height),
+                        ElementType.Ean128 or ElementType.Ean128 => BarcodeGenerator.GenerateCode128(content, (int)elementVm.Width, (int)elementVm.Height),
+                        _ => throw new NotSupportedException("Unsupported barcode type")
+                    };
+
+                    imageControl.Source = newBitmap;
+                    imageControl.Width = newBitmap.PixelSize.Width;
+                    imageControl.Height = newBitmap.PixelSize.Height;
+                    elementVm.Width = newBitmap.PixelSize.Width;
+                    elementVm.Height = newBitmap.PixelSize.Height;
+                    elementVm.Path = $"Generated:{typeName}='{content}'"; // Обновляем отображение
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Ошибка генерации баркода: {ex.Message}");
+                }
+            });
     }
 
-    // Вспомогательный метод: вычисление контрольной цифры EAN-13
-    
+
 
     #endregion
 
