@@ -54,9 +54,6 @@ namespace ZPLEditor.Utils
         public static Bitmap GenerateEan13(string ean13, int width = 200, int height = 200)
         {
             ValidateInput(ean13);
-            if (!IsValidEan13(ean13))
-                throw new ArgumentException("EAN-13 должен содержать ровно 13 цифр.", nameof(ean13));
-
             return GenerateBarcode(writer =>
             {
                 writer.Format = BarcodeFormat.EAN_13;
@@ -108,7 +105,5 @@ namespace ZPLEditor.Utils
                 throw new ArgumentException("Текст не может быть null или пустым.", nameof(text));
         }
 
-        private static bool IsValidEan13(string ean) =>
-            ean.Length == 13 && ean.All(char.IsDigit);
     }
 }

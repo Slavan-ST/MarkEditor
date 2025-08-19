@@ -242,12 +242,16 @@ public class MainViewModel : ViewModelBase
 
     private void AddEan13()
     {
-        // Генерируем тестовый EAN-13: 12 цифр + контрольная (можно рандомизировать)
         var now = DateTime.Now;
-        var baseNum = $"{now.Hour:D2}{now.Minute:D2}{now.Second:D2}123";
-        var ean13 = baseNum + CalculateEan13CheckDigit(baseNum); // Делаем 13 цифр
-        var bitmap = BarcodeGenerator.GenerateEan13(ean13, 200, 80);
-        AddBarcodeToCanvas(bitmap, "EAN13", ean13);
+        // ГГММДДЧЧММСС → берём часть
+        var baseNum = $"{now.Year % 100:D2}{now.Month:D2}{now.Day:D2}{now.Hour:D2}{now.Minute:D2}{now.Second:D2}";
+        // Пример: 250315143045 → 12 цифр
+
+        if (baseNum.Length != 12)
+            baseNum = baseNum.Substring(0, 12); // Обрезаем, если вдруг больше
+
+        var bitmap = BarcodeGenerator.GenerateEan13(baseNum, 200, 80);
+        AddBarcodeToCanvas(bitmap, "EAN13", baseNum);
     }
 
     private void AddDataMatrix()
@@ -259,7 +263,9 @@ public class MainViewModel : ViewModelBase
 
     private void AddCode128()
     {
-        var content = $"[)>{LabelName}|{DateTime.Now:yyMMdd}|{LabelWidth}x{LabelHeight}";
+        //var content = "00046070699704096210";
+        //var content = $"[)>{LabelName}|{DateTime.Now:yyMMdd}|{LabelWidth}x{LabelHeight}";
+        var content = $"00046070699704096210";
         var bitmap = BarcodeGenerator.GenerateCode128(content, 200, 80);
         AddBarcodeToCanvas(bitmap, "Code128", content);
     }
@@ -298,20 +304,7 @@ public class MainViewModel : ViewModelBase
     }
 
     // Вспомогательный метод: вычисление контрольной цифры EAN-13
-    private string CalculateEan13CheckDigit(string ean12)
-    {
-        if (ean12.Length != 12 || !ean12.All(char.IsDigit))
-            throw new ArgumentException("EAN-12 must be 12 digits.");
-
-        int sum = 0;
-        for (int i = 0; i < 12; i++)
-        {
-            int digit = ean12[i] - '0';
-            sum += (i % 2 == 0) ? digit : digit * 3;
-        }
-        int checkDigit = (10 - (sum % 10)) % 10;
-        return checkDigit.ToString();
-    }
+    
 
     #endregion
 

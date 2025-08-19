@@ -52,7 +52,7 @@ namespace ZPLEditor.Utils
 
             // Создаём RenderTargetBitmap нужного размера
             var pixelSize = new PixelSize((int)canvas.Bounds.Width, (int)canvas.Bounds.Height);
-            var dpi = new Vector(96, 96); // стандартный DPI
+            var dpi = new Vector(Dpi, Dpi); // стандартный DPI
             var bitmap = new RenderTargetBitmap(pixelSize, dpi);
 
             // Рендерим элемент в битмап
