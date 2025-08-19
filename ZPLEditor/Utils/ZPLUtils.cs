@@ -66,12 +66,25 @@ namespace ZPLEditor.Utils
 
         private static void ProcessCanvas(Canvas canvas, List<ZplElementBase> zplElements)
         {
-            var data = CanvasToBytes(canvas);
+            var labelWidthInches = 4.0;
+            var labelHeightInches = 2.0;
+            var pixelWidth = (int)(labelWidthInches * Dpi);
+            var pixelHeight = (int)(labelHeightInches * Dpi);
+
+
+            var pixelSize = new PixelSize(pixelWidth, pixelHeight);
+            var dpi = new Vector(Dpi, Dpi);
+            var bitmap = new RenderTargetBitmap(pixelSize, dpi);
+            bitmap.Render(canvas);
+
+            var data = RenderTargetBitmapToByteArray(bitmap);
+
             try
             {
-                char format = 'R'; // Raster format
-                zplElements.Add(new ZplDownloadGraphics(format, "main_canvas", data));
-                zplElements.Add(new ZplRecallGraphic(0, 0, format, "main_canvas"));
+                // Загружаем графику
+                zplElements.Add(new ZplDownloadGraphics('R', "main_canvas", data));
+                // Выводим с небольшим смещением по X
+                zplElements.Add(new ZplRecallGraphic(10, 0, 'R', "main_canvas")); // ← +10 точек
             }
             catch (Exception ex)
             {
@@ -100,7 +113,6 @@ namespace ZPLEditor.Utils
             };
 
             var zpl = engine.ToZplString(options);
-            Debug.WriteLine("Сгенерированный ZPL:\n" + zpl);
             return zpl;
         }
 
