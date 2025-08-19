@@ -11,13 +11,20 @@
 
 	<Grid ColumnDefinitions="*, 300">
 		<!-- Область редактирования -->
-		<Border Grid.Column="0" Margin="10" BorderBrush="Gray" BorderThickness="1">
-			<Canvas Name="LabelCanvas"
-                    Background="White"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Stretch"
-                    PointerPressed="Canvas_PointerPressed"
-                    DragDrop.AllowDrop="True" />
+		<Border Grid.Column="0" Margin="10" BorderBrush="Gray" BorderThickness="1" Padding="5" Background="#f0f0f0">
+			<!-- Центрированный контейнер для Canvas -->
+			<Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+				<Canvas Name="LabelCanvas"
+						Background="White"
+						Width="{Binding LabelWidth}"
+						Height="{Binding LabelHeight}"
+						MinWidth="50" MinHeight="50"
+						HorizontalAlignment="Center"
+						VerticalAlignment="Center"
+						ClipToBounds="True"
+						PointerPressed="Canvas_PointerPressed"
+						DragDrop.AllowDrop="True" />
+			</Grid>
 		</Border>
 
 		<!-- Панель управления -->
@@ -25,6 +32,28 @@
 			<Button Content="Add Text" Command="{Binding AddTextCommand}" Height="40" Margin="0,0,0,10"/>
 			<Button Content="Add Image" Command="{Binding AddImageCommand}" Height="40" Margin="0,0,0,10"/>
 			<Button Content="Generate ZPL" Command="{Binding GenerateZplCommand}" Height="40" Margin="0,0,0,10"/>
+			<Button Content="Print ZPL" Command="{Binding PrintZplCommand}" Height="40" Margin="0,0,0,10"/>
+
+			<!-- Поля для ширины,высоты и имени метки -->
+			<StackPanel Orientation="Horizontal" Margin="0,5,0,2">
+				<TextBlock Text="Label Width:" Width="60" VerticalAlignment="Center"/>
+				<TextBox Text="{Binding LabelWidth}"
+						 Margin="2,0" Width="80"/>
+			</StackPanel>
+
+			<StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+				<TextBlock Text="Label Height:" Width="60" VerticalAlignment="Center"/>
+				<TextBox Text="{Binding LabelHeight}"
+						 Margin="2,0" Width="80"/>
+			</StackPanel>
+			
+			<StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+				<TextBlock Text="Label Name:" Width="60" VerticalAlignment="Center"/>
+				<TextBox Text="{Binding LabelName}"
+						 Margin="2,0" Width="80"/>
+			</StackPanel>
+			
+			
 
 			<TextBlock Text="Elements:" FontWeight="SemiBold" Margin="0,10,0,5"/>
 
@@ -35,7 +64,7 @@
 					<TextBlock Text="Selected Element:" FontWeight="SemiBold" Margin="0,0,0,5"/>
 
 					<!-- Панель видима только если CurrentElement не null -->
-					<StackPanel IsVisible="{Binding CurrentElement}">
+					<StackPanel IsVisible="{Binding IsCurrentElement}">
 						<!-- Строка: Name -->
 						<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
 							<TextBlock Text="Name:" Width="60" VerticalAlignment="Center"/>
@@ -59,9 +88,27 @@
 							<TextBlock Text="Height:" Width="60" Margin="10,0,0,0" VerticalAlignment="Center"/>
 							<TextBox Text="{Binding CurrentElement.Height, Mode=TwoWay}" Margin="2,0" Width="50"/>
 						</StackPanel>
+
+						<!-- Строка: Path -->
+						<StackPanel Orientation="Horizontal" Margin="0,5,0,2">
+							<TextBlock Text="Источник:" Width="60" Margin="10,0,0,0" VerticalAlignment="Center"/>
+							<TextBox IsReadOnly="True" IsEnabled="False" Text="{Binding CurrentElement.Path}" Margin="2,0" Width="50"/>
+						</StackPanel>
+						
+						
+						
+						
 					</StackPanel>
 				</StackPanel>
 			</StackPanel>
+
+			<!-- Кнопка удаления — видима только если есть выбранный элемент -->
+			<Button Content="Delete Element"
+					Command="{Binding RemoveElementCommand}"
+					CommandParameter="{Binding CurrentElement}"
+					Height="40"
+					Margin="0,0,0,10"
+					IsVisible="{Binding IsCurrentElement}"/>
 
 		</StackPanel>
 	</Grid>

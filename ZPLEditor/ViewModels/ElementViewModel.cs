@@ -1,24 +1,24 @@
 ﻿// File: ElementViewModel.cs
 using ReactiveUI;
 using Avalonia.Controls;
+using ReactiveUI.Fody.Helpers;
 
 namespace ZPLEditor.ViewModels;
 
 public class ElementViewModel : ReactiveObject
 {
-    private string _name;
     private double _x;
     private double _y;
     private double _width;
     private double _height;
-    private byte[] _data;
+    private byte[]? _data;
 
     public Control Control { get; }
 
     public ElementViewModel(Control control, string name, double x, double y, double width, double height, byte[] data = null)
     {
         Control = control;
-        _name = name;
+        Name = name;
         _x = x;
         _y = y;
         _width = width;
@@ -26,14 +26,10 @@ public class ElementViewModel : ReactiveObject
         _data = data;
     }
 
-    public string Name
-    {
-        get => _name;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _name, value);
-        }
-    }
+    [Reactive]
+    public string Name { get; set; } = string.Empty;
+    [Reactive]
+    public string Path { get; set; } = string.Empty;
 
     public double X
     {
@@ -74,7 +70,7 @@ public class ElementViewModel : ReactiveObject
             Control.Height = value;
         }
     }
-    public byte[] Data
+    public byte[]? Data
     {
         get => _data;
         set
@@ -83,7 +79,6 @@ public class ElementViewModel : ReactiveObject
             _data = value;
         }
     }
-
     public void UpdateFromControl()
     {
         _x = Canvas.GetLeft(Control);

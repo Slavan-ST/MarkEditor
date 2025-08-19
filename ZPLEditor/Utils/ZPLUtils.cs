@@ -1,6 +1,10 @@
-﻿using Avalonia.Controls;
+﻿using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media.Imaging;
+using Avalonia.Skia;
 using BinaryKits.Zpl.Label;
 using BinaryKits.Zpl.Label.Elements;
+using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -24,89 +28,64 @@ namespace ZPLEditor.Utils
 
         #region Генерация ZPL из элементов холста
 
-        /// <summary>
-        /// Генерирует ZPL-код на основе списка элементов метки.
-        /// Поддерживает TextBox, TextBlock и Image.
-        /// </summary>
-        /// <param name="controls">Список элементов метки (с привязкой к UI-контролам)</param>
-        /// <returns>Сгенерированный ZPL-код как строка</returns>
-        public static string GenerateZplFromControls(IEnumerable<ElementViewModel> controls)
+        public static string GenerateZplFromCanvas(Canvas canvas)
         {
-            if (controls == null)
-                throw new ArgumentNullException(nameof(controls));
+            if (canvas == null)
+                throw new ArgumentNullException(nameof(canvas));
 
             var zplElements = new List<ZplElementBase>();
 
-            foreach (var element in controls)
-            {
-                try
-                {
-                    if (element.Control is TextBox textBox)
-                    {
-                        ProcessTextBox(textBox, element, zplElements);
-                    }
-                    else if (element.Control is TextBlock textBlock)
-                    {
-                        ProcessTextBlock(textBlock, element, zplElements);
-                    }
-                    else if (element.Control is Image image)
-                    {
-                        ProcessImage(image, element, zplElements);
-                    }
-                    else
-                    {
-                        Debug.WriteLine($"Неподдерживаемый тип элемента: {element.Control?.GetType().Name}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Ошибка при обработке элемента '{element.Name}': {ex.Message}");
-                }
-            }
+            ProcessCanvas(canvas, zplElements);
 
             return BuildZplString(zplElements);
         }
 
-        private static void ProcessTextBox(TextBox textBox, ElementViewModel element, List<ZplElementBase> zplElements)
+        public static byte[] CanvasToBytes(Canvas canvas)
         {
-            AddTextElement(textBox.Text, element, zplElements);
-        }
-
-        private static void ProcessTextBlock(TextBlock textBlock, ElementViewModel element, List<ZplElementBase> zplElements)
-        {
-            AddTextElement(textBlock.Text, element, zplElements);
-        }
-
-        private static void AddTextElement(string text, ElementViewModel element, List<ZplElementBase> zplElements)
-        {
-            var x = (int)Canvas.GetLeft(element.Control);
-            var y = (int)Canvas.GetTop(element.Control);
-            var font = new ZplFont(fontWidth: 50, fontHeight: 50); // Можно сделать настраиваемым
-
-            zplElements.Add(new ZplTextField(text, x, y, font));
-        }
-
-        private static void ProcessImage(Image image, ElementViewModel element, List<ZplElementBase> zplElements)
-        {
-            var x = (int)Canvas.GetLeft(image);
-            var y = (int)Canvas.GetTop(image);
-
-            if (string.IsNullOrEmpty(element.Name) || element.Data == null || element.Data.Length == 0)
+            // элемент уже отрисован (Size должен быть > 0)
+            if (canvas.Bounds.Width <= 0 || canvas.Bounds.Height <= 0)
             {
-                Debug.WriteLine("Изображение не содержит данных или имени для загрузки.");
-                return;
+                // Можно вручную задать размер, если нужно
+                canvas.Measure(new Size(800, 600));
+                canvas.Arrange(new Rect(new Size(800, 600)));
             }
 
+            // Создаём RenderTargetBitmap нужного размера
+            var pixelSize = new PixelSize((int)canvas.Bounds.Width, (int)canvas.Bounds.Height);
+            var dpi = new Vector(96, 96); // стандартный DPI
+            var bitmap = new RenderTargetBitmap(pixelSize, dpi);
+
+            // Рендерим элемент в битмап
+            bitmap.Render(canvas);
+
+
+
+            return RenderTargetBitmapToByteArray(bitmap);
+        }
+
+
+        private static void ProcessCanvas(Canvas canvas, List<ZplElementBase> zplElements)
+        {
+            var data = CanvasToBytes(canvas);
             try
             {
-                // Загружаем изображение в память принтера под именем (например, 'R:<name>')
                 char format = 'R'; // Raster format
-                zplElements.Add(new ZplDownloadGraphics(format, element.Name, element.Data));
-                zplElements.Add(new ZplRecallGraphic(x, y, format, element.Name));
+                zplElements.Add(new ZplDownloadGraphics(format, "main_canvas", data));
+                zplElements.Add(new ZplRecallGraphic(0, 0, format, "main_canvas"));
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Ошибка при добавлении изображения '{element.Name}': {ex.Message}");
+                Debug.WriteLine($"Ошибка: {ex.Message}");
+            }
+        }
+
+        public static byte[] RenderTargetBitmapToByteArray(RenderTargetBitmap bitmap)
+        {
+            using (var stream = new MemoryStream())
+            {
+                bitmap.Save(stream);
+                stream.Position = 0; // Важно: сбросить позицию потока
+                return stream.ToArray();
             }
         }
 

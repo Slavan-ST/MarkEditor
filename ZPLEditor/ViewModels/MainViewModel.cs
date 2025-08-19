@@ -18,6 +18,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Reactive;
+using System.Reactive.Linq;
 using System.Xml.Linq;
 using ZPLEditor.Utils;
 using ZPLEditor.Views;
@@ -35,7 +36,12 @@ public class MainViewModel : ViewModelBase
     // --- Данные и состояние ---
 
     [Reactive] public List<ElementViewModel> Elements { get; set; } = new();
-    [Reactive] public ElementViewModel CurrentElement { get; set; }
+    [Reactive] public ElementViewModel? CurrentElement { get; set; } = null;
+    [Reactive] public bool IsCurrentElement { get; set; } = false;
+    [Reactive] public double LabelWidth { get; set; } = 100;
+    [Reactive] public double LabelHeight { get; set; } = 100;
+    [Reactive] public string LabelName { get; set; } = string.Empty;
+
 
     /// <summary>
     /// Текущий элемент, который перетаскивается.
@@ -49,10 +55,6 @@ public class MainViewModel : ViewModelBase
 
     // --- Свойства представления ---
 
-    /// <summary>
-    /// Сгенерированный ZPL-код для отображения.
-    /// </summary>
-    [Reactive] public string ZplOutput { get; set; } = "";
 
     // --- Команды ---
 
@@ -70,16 +72,20 @@ public class MainViewModel : ViewModelBase
     /// Команда генерации ZPL-кода.
     /// </summary>
     public ReactiveCommand<Unit, Unit> GenerateZplCommand { get; }
+    public ReactiveCommand<Unit, Unit> PrintZplCommand { get; }
     public ReactiveCommand<ElementViewModel, Unit> RemoveElementCommand { get; }
 
     private void RemoveElement(ElementViewModel element)
     {
-        _mainWindow.LabelCanvas.Children.Remove(element.Control);
-        Elements.Remove(element);
-
-        if (CurrentElement == element)
+        if (_mainWindow.LabelCanvas.Children.Contains(element.Control))
         {
-            CurrentElement = null;
+            _mainWindow.LabelCanvas.Children.Remove(element.Control);
+            Elements.Remove(element);
+
+            if (CurrentElement == element)
+            {
+                CurrentElement = null;
+            }
         }
     }
     // --- Конструктор ---
@@ -95,11 +101,15 @@ public class MainViewModel : ViewModelBase
         // Инициализация команд
         AddTextCommand = ReactiveCommand.Create(AddTextBox);
         AddImageCommand = ReactiveCommand.Create(AddImage);
+        PrintZplCommand = ReactiveCommand.Create(() =>
+        {
+            string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas);
+            ZPLUtils.PrintZPL(zpl);
+        });
         GenerateZplCommand = ReactiveCommand.Create(() =>
         {
-            string zpl = ZPLUtils.GenerateZplFromControls(Elements);
-            // ZPLUtils.PrintZPL(zpl); // Раскомментировать для печати
-            ZplOutput = zpl;
+            string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas);
+            Debug.WriteLine(zpl);
         });
         RemoveElementCommand = ReactiveCommand.Create<ElementViewModel>(RemoveElement);
 
@@ -108,6 +118,18 @@ public class MainViewModel : ViewModelBase
             InputElement.PointerPressedEvent,
             Canvas_PointerPressed,
             RoutingStrategies.Tunnel);
+
+        this.WhenAnyValue(x => x.CurrentElement)
+            .Select(element => element != null)
+            .BindTo(this, x => x.IsCurrentElement);
+
+        this.WhenAnyValue(x => x.LabelWidth)
+            .Where(w => w > 0)
+            .Subscribe(w => LabelWidth = w);
+
+        this.WhenAnyValue(x => x.LabelHeight)
+            .Where(h => h > 0)
+            .Subscribe(h => LabelHeight = h);
 
         _mainWindow.LabelCanvas.PointerMoved += HandlePointerMoved;
         _mainWindow.LabelCanvas.PointerReleased += HandlePointerReleased;
@@ -197,6 +219,7 @@ public class MainViewModel : ViewModelBase
             var data = File.ReadAllBytes(filePath);
             var elementVm = new ElementViewModel(imageControl, fileName, 50, 50, bitmap.PixelSize.Width, bitmap.PixelSize.Height, data);
             Elements.Add(elementVm);
+            elementVm.Path = filePath;
 
             _mainWindow.LabelCanvas.Children.Add(imageControl);
             CurrentElement = elementVm;
@@ -262,7 +285,7 @@ public class MainViewModel : ViewModelBase
     /// </summary>
     /// <param name="start">Начальный элемент для поиска.</param>
     /// <returns>Найденный элемент или null.</returns>
-    private Control FindParentControlInCanvas(Control start)
+    private Control? FindParentControlInCanvas(Control start)
     {
         var current = start;
         while (current != null)
