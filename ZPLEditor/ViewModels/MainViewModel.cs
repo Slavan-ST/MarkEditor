@@ -34,7 +34,6 @@ public class MainViewModel : ViewModelBase
     private readonly MainView _mainWindow;
 
     // --- Данные и состояние ---
-
     [Reactive] public List<ElementViewModel> Elements { get; set; } = new();
     [Reactive] public ElementViewModel? CurrentElement { get; set; } = null;
     [Reactive] public bool IsCurrentElement { get; set; } = false;
@@ -42,22 +41,18 @@ public class MainViewModel : ViewModelBase
     [Reactive] public double LabelHeight { get; set; } = 100;
     [Reactive] public string LabelName { get; set; } = string.Empty;
 
-
     /// <summary>
     /// Текущий элемент, который перетаскивается.
     /// </summary>
-    private Control _draggedElement;
+    private Control? _draggedElement;
 
     /// <summary>
     /// Начальная точка перетаскивания.
     /// </summary>
     private Point _startPoint;
 
-    // --- Свойства представления ---
-
 
     // --- Команды ---
-
     /// <summary>
     /// Команда добавления текстового элемента.
     /// </summary>
@@ -72,24 +67,23 @@ public class MainViewModel : ViewModelBase
     /// Команда генерации ZPL-кода.
     /// </summary>
     public ReactiveCommand<Unit, Unit> GenerateZplCommand { get; }
+
+    /// <summary>
+    /// Команда печати ZPL.
+    /// </summary>
     public ReactiveCommand<Unit, Unit> PrintZplCommand { get; }
+
+    /// <summary>
+    /// Команда удаления элемента.
+    /// </summary>
     public ReactiveCommand<ElementViewModel, Unit> RemoveElementCommand { get; }
+    public ReactiveCommand<Unit, Unit> AddQrCodeCommand { get; }
+    public ReactiveCommand<Unit, Unit> AddEan13Command { get; }
+    public ReactiveCommand<Unit, Unit> AddDataMatrixCommand { get; }
+    public ReactiveCommand<Unit, Unit> AddCode128Command { get; }
 
-    private void RemoveElement(ElementViewModel element)
-    {
-        if (_mainWindow.LabelCanvas.Children.Contains(element.Control))
-        {
-            _mainWindow.LabelCanvas.Children.Remove(element.Control);
-            Elements.Remove(element);
 
-            if (CurrentElement == element)
-            {
-                CurrentElement = null;
-            }
-        }
-    }
     // --- Конструктор ---
-
     /// <summary>
     /// Инициализирует новый экземпляр <see cref="MainViewModel"/>.
     /// </summary>
@@ -99,8 +93,15 @@ public class MainViewModel : ViewModelBase
         _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
 
         // Инициализация команд
+        // В конструкторе MainViewModel после других команд
+        AddQrCodeCommand = ReactiveCommand.Create(AddQrCode);
+        AddEan13Command = ReactiveCommand.Create(AddEan13);
+        AddDataMatrixCommand = ReactiveCommand.Create(AddDataMatrix);
+        AddCode128Command = ReactiveCommand.Create(AddCode128);
+
         AddTextCommand = ReactiveCommand.Create(AddTextBox);
         AddImageCommand = ReactiveCommand.Create(AddImage);
+
         PrintZplCommand = ReactiveCommand.Create(() =>
         {
             string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas);
@@ -111,6 +112,7 @@ public class MainViewModel : ViewModelBase
             string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas);
             Debug.WriteLine(zpl);
         });
+
         RemoveElementCommand = ReactiveCommand.Create<ElementViewModel>(RemoveElement);
 
         // Подписка на события холста
@@ -134,6 +136,7 @@ public class MainViewModel : ViewModelBase
         _mainWindow.LabelCanvas.PointerMoved += HandlePointerMoved;
         _mainWindow.LabelCanvas.PointerReleased += HandlePointerReleased;
     }
+
 
     // --- Работа с элементами на холсте ---
 
@@ -185,10 +188,10 @@ public class MainViewModel : ViewModelBase
         {
             Title = "Выберите изображение",
             Filters = new List<FileDialogFilter>
-        {
-            new() { Name = "Изображения", Extensions = { "png", "jpg", "jpeg", "bmp", "gif" } },
-            new() { Name = "Все файлы", Extensions = { "*" } }
-        },
+            {
+                new() { Name = "Изображения", Extensions = { "png", "jpg", "jpeg", "bmp", "gif" } },
+                new() { Name = "Все файлы", Extensions = { "*" } }
+            },
             AllowMultiple = false
         };
 
@@ -230,7 +233,88 @@ public class MainViewModel : ViewModelBase
         }
     }
 
+    private void AddQrCode()
+    {
+        var content = $"QR-{LabelName}-{DateTime.Now:HHmmss}";
+        var bitmap = BarcodeGenerator.GenerateQrCode(content, 100, 100);
+        AddBarcodeToCanvas(bitmap, "QR", content);
+    }
+
+    private void AddEan13()
+    {
+        // Генерируем тестовый EAN-13: 12 цифр + контрольная (можно рандомизировать)
+        var now = DateTime.Now;
+        var baseNum = $"{now.Hour:D2}{now.Minute:D2}{now.Second:D2}123";
+        var ean13 = baseNum + CalculateEan13CheckDigit(baseNum); // Делаем 13 цифр
+        var bitmap = BarcodeGenerator.GenerateEan13(ean13, 200, 80);
+        AddBarcodeToCanvas(bitmap, "EAN13", ean13);
+    }
+
+    private void AddDataMatrix()
+    {
+        var content = $"DM-X:{LabelWidth:F0},Y:{LabelHeight:F0}";
+        var bitmap = BarcodeGenerator.GenerateDataMatrix(content, 100, 100);
+        AddBarcodeToCanvas(bitmap, "DataMatrix", content);
+    }
+
+    private void AddCode128()
+    {
+        var content = $"[)>{LabelName}|{DateTime.Now:yyMMdd}|{LabelWidth}x{LabelHeight}";
+        var bitmap = BarcodeGenerator.GenerateCode128(content, 200, 80);
+        AddBarcodeToCanvas(bitmap, "Code128", content);
+    }
+
+    // Вспомогательный метод: добавляет баркод как изображение на холст
+    private void AddBarcodeToCanvas(Bitmap bitmap, string typeName, string data)
+    {
+        var imageControl = new Image
+        {
+            Source = bitmap,
+            Width = bitmap.PixelSize.Width,
+            Height = bitmap.PixelSize.Height,
+            Stretch = Stretch.Fill,
+            IsHitTestVisible = true
+        };
+
+        double left = 50;
+        double top = 50;
+
+        Canvas.SetLeft(imageControl, left);
+        Canvas.SetTop(imageControl, top);
+
+        var elementVm = new ElementViewModel(
+            imageControl,
+            $"{typeName}_{Elements.Count + 1}",
+            left, top,
+            bitmap.PixelSize.Width,
+            bitmap.PixelSize.Height,
+            null // можно хранить байты, если нужно
+        );
+        elementVm.Path = $"Generated:{typeName}='{data}'"; // для отображения в UI
+
+        Elements.Add(elementVm);
+        _mainWindow.LabelCanvas.Children.Add(imageControl);
+        CurrentElement = elementVm;
+    }
+
+    // Вспомогательный метод: вычисление контрольной цифры EAN-13
+    private string CalculateEan13CheckDigit(string ean12)
+    {
+        if (ean12.Length != 12 || !ean12.All(char.IsDigit))
+            throw new ArgumentException("EAN-12 must be 12 digits.");
+
+        int sum = 0;
+        for (int i = 0; i < 12; i++)
+        {
+            int digit = ean12[i] - '0';
+            sum += (i % 2 == 0) ? digit : digit * 3;
+        }
+        int checkDigit = (10 - (sum % 10)) % 10;
+        return checkDigit.ToString();
+    }
+
     #endregion
+
 
     #region Обработка перетаскивания элементов
 
@@ -331,6 +415,29 @@ public class MainViewModel : ViewModelBase
     {
         e.Pointer.Capture(null);
         _draggedElement = null;
+    }
+
+    #endregion
+
+
+    #region Удаление элементов
+
+    /// <summary>
+    /// Удаляет элемент с холста и из коллекции.
+    /// </summary>
+    /// <param name="element">Элемент для удаления.</param>
+    private void RemoveElement(ElementViewModel element)
+    {
+        if (_mainWindow.LabelCanvas.Children.Contains(element.Control))
+        {
+            _mainWindow.LabelCanvas.Children.Remove(element.Control);
+            Elements.Remove(element);
+
+            if (CurrentElement == element)
+            {
+                CurrentElement = null;
+            }
+        }
     }
 
     #endregion

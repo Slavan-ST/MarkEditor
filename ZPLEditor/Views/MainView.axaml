@@ -33,6 +33,10 @@
 			<Button Content="Add Image" Command="{Binding AddImageCommand}" Height="40" Margin="0,0,0,10"/>
 			<Button Content="Generate ZPL" Command="{Binding GenerateZplCommand}" Height="40" Margin="0,0,0,10"/>
 			<Button Content="Print ZPL" Command="{Binding PrintZplCommand}" Height="40" Margin="0,0,0,10"/>
+			<Button Content="Add QR Code" Command="{Binding AddQrCodeCommand}" Height="40" Margin="0,0,0,10"/>
+			<Button Content="Add EAN-13" Command="{Binding AddEan13Command}" Height="40" Margin="0,0,0,10"/>
+			<Button Content="Add Data Matrix" Command="{Binding AddDataMatrixCommand}" Height="40" Margin="0,0,0,10"/>
+			<Button Content="Add Code 128" Command="{Binding AddCode128Command}" Height="40" Margin="0,0,0,10"/>
 
 			<!-- Поля для ширины,высоты и имени метки -->
 			<StackPanel Orientation="Horizontal" Margin="0,5,0,2">
