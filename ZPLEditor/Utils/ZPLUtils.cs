@@ -37,32 +37,11 @@ namespace ZPLEditor.Utils
 
             ProcessCanvas(canvas, zplElements);
 
+            //CanvasExporter.SaveCanvasToFile(canvas, "C:\\temp\\debug.png"); // тест изображения
             return BuildZplString(zplElements);
         }
 
-        public static byte[] CanvasToBytes(Canvas canvas)
-        {
-            // элемент уже отрисован (Size должен быть > 0)
-            if (canvas.Bounds.Width <= 0 || canvas.Bounds.Height <= 0)
-            {
-                // Можно вручную задать размер, если нужно
-                canvas.Measure(new Size(800, 600));
-                canvas.Arrange(new Rect(new Size(800, 600)));
-            }
-
-            // Создаём RenderTargetBitmap нужного размера
-            var pixelSize = new PixelSize((int)canvas.Bounds.Width, (int)canvas.Bounds.Height);
-            var dpi = new Vector(Dpi, Dpi); // стандартный DPI
-            var bitmap = new RenderTargetBitmap(pixelSize, dpi);
-
-            // Рендерим элемент в битмап
-            bitmap.Render(canvas);
-
-
-
-            return RenderTargetBitmapToByteArray(bitmap);
-        }
-
+    
 
         private static void ProcessCanvas(Canvas canvas, List<ZplElementBase> zplElements)
         {
