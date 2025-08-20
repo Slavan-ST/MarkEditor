@@ -20,6 +20,7 @@ using System.Net.Sockets;
 using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using ZPLEditor.Utils;
 using ZPLEditor.Views;
@@ -32,7 +33,7 @@ namespace ZPLEditor.ViewModels;
 /// </summary>
 public class MainViewModel : ViewModelBase
 {
-    private readonly MainView _mainWindow;
+    public readonly MainView _mainWindow;
 
     // --- Данные и состояние ---
     [Reactive] public List<ElementViewModel> Elements { get; set; } = new();
@@ -82,6 +83,8 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> AddEan13Command { get; }
     public ReactiveCommand<Unit, Unit> AddDataMatrixCommand { get; }
     public ReactiveCommand<Unit, Unit> AddCode128Command { get; }
+    public ReactiveCommand<Unit, Unit> SaveCommand { get; }
+    public ReactiveCommand<Unit, Unit> LoadCommand { get; }
 
 
     // --- Конструктор ---
@@ -99,6 +102,9 @@ public class MainViewModel : ViewModelBase
         AddEan13Command = ReactiveCommand.Create(AddEan13);
         AddDataMatrixCommand = ReactiveCommand.Create(AddDataMatrix);
         AddCode128Command = ReactiveCommand.Create(AddCode128);
+
+        SaveCommand = ReactiveCommand.CreateFromTask(Save);
+        LoadCommand = ReactiveCommand.CreateFromTask(Load);
 
         AddTextCommand = ReactiveCommand.Create(AddTextBox);
         AddImageCommand = ReactiveCommand.Create(AddImage);
@@ -140,7 +146,42 @@ public class MainViewModel : ViewModelBase
 
 
     // --- Работа с элементами на холсте ---
+    #region Сохранение/загрузка этикетки
+    public async Task Save()
+    {
+        try
+        {
+            var window = (Window)_mainWindow.GetVisualRoot();
+            var filePath = await FileManager.SaveJsonFileAsync(window);
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                ProjectSerializer.SaveProjectInFile(filePath, this);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Ошибка при сохранении: {ex.Message}");
+        }
+    }
 
+    public async Task Load()
+    {
+        try
+        {
+            var window = (Window)_mainWindow.GetVisualRoot();
+            var filePath = await FileManager.OpenJsonFileAsync(window);
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                ProjectSerializer.LoadProjectFromFile(filePath, this);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Ошибка при загрузке: {ex.Message}");
+        }
+    }
+
+    #endregion
     #region Добавление элементов
 
     /// <summary>
@@ -223,23 +264,7 @@ public class MainViewModel : ViewModelBase
     /// </summary>
     private async void AddImage()
     {
-        var dialog = new OpenFileDialog
-        {
-            Title = "Выберите изображение",
-            Filters = new List<FileDialogFilter>
-            {
-                new() { Name = "Изображения", Extensions = { "png", "jpg", "jpeg", "bmp", "gif" } },
-                new() { Name = "Все файлы", Extensions = { "*" } }
-            },
-            AllowMultiple = false
-        };
-
-        var window = (Window)_mainWindow.GetVisualRoot();
-        var result = await dialog.ShowAsync(window);
-
-        if (result == null || result.Length == 0) return;
-
-        var filePath = result[0];
+        var filePath = await FileManager.OpenImageFileAsync((Window)_mainWindow.GetVisualRoot());
 
         try
         {
