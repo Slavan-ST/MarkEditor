@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Skia;
 using BinaryKits.Zpl.Label;
@@ -25,6 +26,7 @@ namespace ZPLEditor.Utils
         private const string PrinterIp = "192.168.10.202";
         private const int PrinterPort = 9100;
         private const int Dpi = 304; // Типичное разрешение для промышленных принтеров Zebra
+        private const int SourceDpi = 96; // Типичное разрешение для avalonia
 
         #region Генерация ZPL из элементов холста
 
@@ -41,29 +43,42 @@ namespace ZPLEditor.Utils
             return BuildZplString(zplElements);
         }
 
-    
+
 
         private static void ProcessCanvas(Canvas canvas, List<ZplElementBase> zplElements)
         {
-            var labelWidthInches = 4.0;
-            var labelHeightInches = 2.0;
-            var pixelWidth = (int)(labelWidthInches * Dpi);
-            var pixelHeight = (int)(labelHeightInches * Dpi);
+            const double UiDpi = 96;
 
+            // Явно заданные размеры в дюймах
+            var widthInches = canvas.Width / UiDpi;
+            var heightInches = canvas.Height / UiDpi;
+
+            // Целевой размер в пикселях
+            var pixelWidth = (int)Math.Ceiling(widthInches * Dpi);
+            var pixelHeight = (int)Math.Ceiling(heightInches * Dpi);
 
             var pixelSize = new PixelSize(pixelWidth, pixelHeight);
-            var dpi = new Vector(Dpi, Dpi);
-            var bitmap = new RenderTargetBitmap(pixelSize, dpi);
-            bitmap.Render(canvas);
+            var dpi = new Vector(96, 96);
+
+            using var bitmap = new RenderTargetBitmap(pixelSize, dpi);
+
+            using (var context = bitmap.CreateDrawingContext())
+            {
+                var scaleX = Dpi / UiDpi;
+                var scaleY = Dpi / UiDpi;
+
+                context.PushPostTransform(Matrix.CreateScale(scaleX, scaleY));
+                var brush = new VisualBrush(canvas);
+                context.DrawRectangle(brush, null, new Rect(0, 0, canvas.Width, canvas.Height));
+                //context.Pop();
+            }
 
             var data = RenderTargetBitmapToByteArray(bitmap);
 
             try
             {
-                // Загружаем графику
-                zplElements.Add(new ZplDownloadGraphics('R', "main_canvas", data));
-                // Выводим с небольшим смещением по X
-                zplElements.Add(new ZplRecallGraphic(10, 0, 'R', "main_canvas")); // ← +10 точек
+                zplElements.Add(new ZplDownloadGraphics('R', "label", data));
+                zplElements.Add(new ZplRecallGraphic(0, 0, 'R', "label")); // Позиция 0,0
             }
             catch (Exception ex)
             {
@@ -73,12 +88,9 @@ namespace ZPLEditor.Utils
 
         public static byte[] RenderTargetBitmapToByteArray(RenderTargetBitmap bitmap)
         {
-            using (var stream = new MemoryStream())
-            {
-                bitmap.Save(stream);
-                stream.Position = 0; // Важно: сбросить позицию потока
-                return stream.ToArray();
-            }
+            using var stream = new MemoryStream();
+            bitmap.Save(stream); // Сохраняет как PNG
+            return stream.ToArray();
         }
 
         private static string BuildZplString(List<ZplElementBase> zplElements)
