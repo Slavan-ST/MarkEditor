@@ -30,29 +30,6 @@
 		<ScrollViewer Grid.Column="1" Margin="10" VerticalScrollBarVisibility="Auto">
 			<StackPanel Spacing="10">
 
-				<!-- Группа: Добавление элементов -->
-				<Border BorderBrush="#ccc" BorderThickness="1" Padding="10" Margin="0,0,0,10">
-					<Border.Styles>
-						<Style Selector="Border > TextBlock.header">
-							<Setter Property="Margin" Value="0,0,0,8"/>
-							<Setter Property="FontSize" Value="14"/>
-							<Setter Property="FontWeight" Value="SemiBold"/>
-							<Setter Property="Text" Value="Добавить элемент"/>
-						</Style>
-					</Border.Styles>
-					<StackPanel>
-						<TextBlock Classes="header"/>
-						<Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
-							<Button Grid.Row="0" Grid.Column="0" Content="Текст" Command="{Binding AddTextCommand}" Height="40"/>
-							<Button Grid.Row="0" Grid.Column="1" Content="Изображение" Command="{Binding AddImageCommand}" Height="40"/>
-							<Button Grid.Row="1" Grid.Column="0" Content="QR-код" Command="{Binding AddQrCodeCommand}" Height="40"/>
-							<Button Grid.Row="1" Grid.Column="1" Content="Штрихкод EAN-13" Command="{Binding AddEan13Command}" Height="40"/>
-							<Button Grid.Row="2" Grid.Column="0" Content="Data Matrix" Command="{Binding AddDataMatrixCommand}" Height="40"/>
-							<Button Grid.Row="2" Grid.Column="1" Content="Code 128" Command="{Binding AddCode128Command}" Height="40"/>
-						</Grid>
-					</StackPanel>
-				</Border>
-
 				<!-- Группа: Параметры метки -->
 				<Border BorderBrush="#ccc" BorderThickness="1" Padding="10" Margin="0,0,0,10">
 					<Border.Styles>
@@ -63,27 +40,76 @@
 							<Setter Property="Text" Value="Параметры метки"/>
 						</Style>
 					</Border.Styles>
-					<StackPanel>
+					<StackPanel Spacing="8">
 						<TextBlock Classes="header"/>
-						<StackPanel Spacing="5">
-							<StackPanel Orientation="Horizontal">
-								<TextBlock Text="Ширина:" Width="80" VerticalAlignment="Center"/>
-								<TextBox Text="{Binding LabelWidth}" Width="100" VerticalAlignment="Center"/>
-							</StackPanel>
-
-							<StackPanel Orientation="Horizontal">
-								<TextBlock Text="Высота:" Width="80" VerticalAlignment="Center"/>
-								<TextBox Text="{Binding LabelHeight}" Width="100" VerticalAlignment="Center"/>
-							</StackPanel>
-
-							<StackPanel Orientation="Horizontal">
-								<TextBlock Text="Имя метки:" Width="80" VerticalAlignment="Center"/>
-								<TextBox Text="{Binding LabelName}" Width="100" VerticalAlignment="Center"/>
-							</StackPanel>
-						</StackPanel>
+						<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto" Margin="0,0,0,4">
+							<TextBlock Text="Ширина:" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0"/>
+							<TextBox Text="{Binding LabelWidth, Mode=TwoWay}" Grid.Column="1" VerticalAlignment="Center"/>
+						</Grid>
+						<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto" Margin="0,0,0,4">
+							<TextBlock Text="Высота:" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0"/>
+							<TextBox Text="{Binding LabelHeight, Mode=TwoWay}" Grid.Column="1" VerticalAlignment="Center"/>
+						</Grid>
+						<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto" Margin="0,0,0,4">
+							<TextBlock Text="Имя метки:" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0"/>
+							<TextBox Text="{Binding LabelName, Mode=TwoWay}" Grid.Column="1" VerticalAlignment="Center"/>
+						</Grid>
 					</StackPanel>
 				</Border>
 
+				<!-- Группа: Действия -->
+				<Border BorderBrush="#ccc" BorderThickness="1" Padding="10" Margin="0,0,0,10">
+					<Border.Styles>
+						<Style Selector="Border > TextBlock.header">
+							<Setter Property="Margin" Value="0,0,0,8"/>
+							<Setter Property="FontSize" Value="14"/>
+							<Setter Property="FontWeight" Value="SemiBold"/>
+							<Setter Property="Text" Value="Действия"/>
+						</Style>
+						<Style Selector="Border StackPanel Button">
+							<Setter Property="Height" Value="40"/>
+							<Setter Property="MinWidth" Value="140"/>
+							<Setter Property="Margin" Value="0,0,0,8"/>
+							<Setter Property="HorizontalAlignment" Value="Stretch"/>
+						</Style>
+					</Border.Styles>
+					<StackPanel Spacing="8">
+						<TextBlock Classes="header"/>
+						<Button Content="Сохранить шаблон" Command="{Binding SaveCommand}"/>
+						<Button Content="Загрузить шаблон" Command="{Binding LoadCommand}"/>
+						<Button Content="Сгенерировать ZPL" Command="{Binding GenerateZplCommand}"/>
+						<Button Content="Печать ZPL" Command="{Binding PrintZplCommand}"/>
+					</StackPanel>
+				</Border>
+
+				<!-- Группа: Добавление элементов -->
+				<Border BorderBrush="#ccc" BorderThickness="1" Padding="10" Margin="0,0,0,10">
+					<Border.Styles>
+						<Style Selector="Border > TextBlock.header">
+							<Setter Property="Margin" Value="0,0,0,8"/>
+							<Setter Property="FontSize" Value="14"/>
+							<Setter Property="FontWeight" Value="SemiBold"/>
+							<Setter Property="Text" Value="Добавить элемент"/>
+						</Style>
+						<Style Selector="Border Grid Button">
+							<Setter Property="Height" Value="40"/>
+							<Setter Property="MinWidth" Value="120"/>
+							<Setter Property="Margin" Value="0,0,4,4"/>
+							<Setter Property="HorizontalAlignment" Value="Stretch"/>
+						</Style>
+					</Border.Styles>
+					<StackPanel Spacing="8">
+						<TextBlock Classes="header"/>
+						<Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
+							<Button Grid.Row="0" Grid.Column="0" Content="Текст" Command="{Binding AddTextCommand}"/>
+							<Button Grid.Row="0" Grid.Column="1" Content="Изображение" Command="{Binding AddImageCommand}"/>
+							<Button Grid.Row="1" Grid.Column="0" Content="QR-код" Command="{Binding AddQrCodeCommand}"/>
+							<Button Grid.Row="1" Grid.Column="1" Content="Штрихкод EAN-13" Command="{Binding AddEan13Command}"/>
+							<Button Grid.Row="2" Grid.Column="0" Content="Data Matrix" Command="{Binding AddDataMatrixCommand}"/>
+							<Button Grid.Row="2" Grid.Column="1" Content="Code 128" Command="{Binding AddCode128Command}"/>
+						</Grid>
+					</StackPanel>
+				</Border>
 				<!-- Группа: Свойства элемента -->
 				<Border BorderBrush="#ccc" BorderThickness="1" Padding="10" Margin="0,0,0,10">
 					<Border.Styles>
@@ -94,54 +120,57 @@
 							<Setter Property="Text" Value="Свойства элемента"/>
 						</Style>
 					</Border.Styles>
-					<StackPanel>
+					<StackPanel Spacing="8">
 						<TextBlock Classes="header"/>
-						<StackPanel IsVisible="{Binding IsCurrentElement}" Spacing="5">
+
+						<StackPanel IsVisible="{Binding IsCurrentElement}" Spacing="8">
 							<!-- Имя -->
-							<StackPanel Orientation="Horizontal">
-								<TextBlock Text="Имя:" Width="80" VerticalAlignment="Center"/>
-								<TextBox Text="{Binding CurrentElement.Name, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
-							</StackPanel>
+							<Grid ColumnDefinitions="Auto,*" Margin="0,0,0,4">
+								<TextBlock Text="Имя:" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0"/>
+								<TextBox Text="{Binding CurrentElement.Name, Mode=TwoWay}" Grid.Column="1"/>
+							</Grid>
 
 							<!-- X и Y -->
-							<StackPanel Orientation="Horizontal">
-								<TextBlock Text="X:" Width="80" VerticalAlignment="Center"/>
-								<TextBox Text="{Binding CurrentElement.X, Mode=TwoWay}" Width="80"/>
-								<TextBlock Text="Y:" Width="80" Margin="10,0,0,0" VerticalAlignment="Center"/>
-								<TextBox Text="{Binding CurrentElement.Y, Mode=TwoWay}" Width="80"/>
-							</StackPanel>
+							<Grid ColumnDefinitions="Auto,*,Auto,*" Margin="0,0,0,4" Height="30">
+								<TextBlock Text="X:" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0"/>
+								<TextBox Text="{Binding CurrentElement.X, Mode=TwoWay}" Grid.Column="1" VerticalAlignment="Center"/>
+
+								<TextBlock Text="Y:" Grid.Column="2" VerticalAlignment="Center" Margin="16,0,8,0"/>
+								<TextBox Text="{Binding CurrentElement.Y, Mode=TwoWay}" Grid.Column="3" VerticalAlignment="Center"/>
+							</Grid>
 
 							<!-- Ширина и высота -->
-							<StackPanel Orientation="Horizontal">
-								<TextBlock Text="Ширина:" Width="80" VerticalAlignment="Center"/>
-								<TextBox Text="{Binding CurrentElement.Width, Mode=TwoWay}" Width="80"/>
-								<TextBlock Text="Высота:" Width="80" Margin="10,0,0,0" VerticalAlignment="Center"/>
-								<TextBox Text="{Binding CurrentElement.Height, Mode=TwoWay}" Width="80"/>
-							</StackPanel>
+							<Grid ColumnDefinitions="Auto,*,Auto,*" Margin="0,0,0,4" Height="30">
+								<TextBlock Text="Ширина:" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0"/>
+								<TextBox Text="{Binding CurrentElement.Width, Mode=TwoWay}" Grid.Column="1" VerticalAlignment="Center"/>
 
-							<!-- Контент -->
-							<StackPanel Orientation="Horizontal" IsVisible="{Binding CurrentElement.IsContentVisible}">
-								<TextBlock Text="Текст:" Width="80" VerticalAlignment="Center"/>
-								<TextBox Text="{Binding CurrentElement.Content, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
-							</StackPanel>
+								<TextBlock Text="Высота:" Grid.Column="2" VerticalAlignment="Center" Margin="16,0,8,0"/>
+								<TextBox Text="{Binding CurrentElement.Height, Mode=TwoWay}" Grid.Column="3" VerticalAlignment="Center"/>
+							</Grid>
+
+							<!-- Текст -->
+							<Grid ColumnDefinitions="Auto,*" Margin="0,0,0,4" IsVisible="{Binding CurrentElement.IsContentVisible}">
+								<TextBlock Text="Текст:" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0"/>
+								<TextBox Text="{Binding CurrentElement.Content, Mode=TwoWay}" Grid.Column="1"/>
+							</Grid>
 
 							<!-- Путь к файлу -->
-							<StackPanel Orientation="Horizontal" IsVisible="{Binding CurrentElement.IsPathVisible}">
-								<TextBlock Text="Источник:" Width="80" VerticalAlignment="Center"/>
-								<TextBox Text="{Binding CurrentElement.Path, Mode=OneWay}" IsReadOnly="True" HorizontalAlignment="Stretch"/>
-							</StackPanel>
+							<Grid ColumnDefinitions="Auto,*" Margin="0,0,0,4" IsVisible="{Binding CurrentElement.IsPathVisible}">
+								<TextBlock Text="Источник:" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0"/>
+								<TextBox Text="{Binding CurrentElement.Path, Mode=OneWay}" IsReadOnly="True" Grid.Column="1"/>
+							</Grid>
 
 							<!-- Размер шрифта -->
-							<StackPanel Orientation="Horizontal" IsVisible="{Binding CurrentElement.IsFontSizeVisible}">
-								<TextBlock Text="Размер:" Width="80" VerticalAlignment="Center"/>
-								<TextBox Text="{Binding CurrentElement.FontSize, Mode=TwoWay}" Width="80"/>
-							</StackPanel>
+							<Grid ColumnDefinitions="Auto,*" Margin="0,0,0,4" IsVisible="{Binding CurrentElement.IsFontSizeVisible}">
+								<TextBlock Text="Размер шрифта:" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0"/>
+								<TextBox Text="{Binding CurrentElement.FontSize, Mode=TwoWay}" Grid.Column="1" Width="80"/>
+							</Grid>
 
 							<!-- Поворот -->
-							<StackPanel Orientation="Horizontal" IsVisible="{Binding CurrentElement.IsRotationVisible}">
-								<TextBlock Text="Поворот:" Width="80" VerticalAlignment="Center"/>
-								<TextBox Text="{Binding CurrentElement.Rotation, Mode=TwoWay}" Width="80"/>
-							</StackPanel>
+							<Grid ColumnDefinitions="Auto,*" Margin="0,0,0,4" IsVisible="{Binding CurrentElement.IsRotationVisible}">
+								<TextBlock Text="Поворот:" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0"/>
+								<TextBox Text="{Binding CurrentElement.Rotation, Mode=TwoWay}" Grid.Column="1" Width="80"/>
+							</Grid>
 						</StackPanel>
 					</StackPanel>
 				</Border>
@@ -151,31 +180,12 @@
                         Command="{Binding RemoveElementCommand}"
                         CommandParameter="{Binding CurrentElement}"
                         Height="40"
+                        MinWidth="140"
                         IsVisible="{Binding IsCurrentElement}"
                         Background="Red"
                         Foreground="White"
-                        Margin="0,5,0,0"/>
-
-				<!-- Группа: Действия -->
-				<Border BorderBrush="#ccc" BorderThickness="1" Padding="10" Margin="0,10,0,0">
-					<Border.Styles>
-						<Style Selector="Border > TextBlock.header">
-							<Setter Property="Margin" Value="0,0,0,8"/>
-							<Setter Property="FontSize" Value="14"/>
-							<Setter Property="FontWeight" Value="SemiBold"/>
-							<Setter Property="Text" Value="Действия"/>
-						</Style>
-					</Border.Styles>
-					<StackPanel>
-						<TextBlock Classes="header"/>
-						<StackPanel Spacing="5">
-							<Button Content="Сохранить шаблон" Command="{Binding SaveCommand}" Height="40"/>
-							<Button Content="Загрузить шаблон" Command="{Binding LoadCommand}" Height="40"/>
-							<Button Content="Сгенерировать ZPL" Command="{Binding GenerateZplCommand}" Height="40"/>
-							<Button Content="Печать ZPL" Command="{Binding PrintZplCommand}" Height="40"/>
-						</StackPanel>
-					</StackPanel>
-				</Border>
+                        HorizontalAlignment="Stretch"
+                        Margin="0,8,0,0"/>
 			</StackPanel>
 		</ScrollViewer>
 	</Grid>

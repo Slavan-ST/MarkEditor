@@ -213,7 +213,6 @@ public class ElementViewModel : ReactiveObject, IDisposable
         IsFontSizeVisible = type is ElementType.Text or
                                  ElementType.Ean13 or
                                  ElementType.Ean128 or
-                                 ElementType.QrCode or
                                  ElementType.DataMatrix;
         IsRotationVisible = true;
     }
