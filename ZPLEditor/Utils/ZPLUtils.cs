@@ -5,6 +5,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Skia;
 using BinaryKits.Zpl.Label;
 using BinaryKits.Zpl.Label.Elements;
+using DynamicData;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
@@ -31,14 +32,14 @@ namespace ZPLEditor.Utils
 
         #region Генерация ZPL из элементов холста
 
-        public static string GenerateZplFromCanvas(Canvas canvas)
+        public static string GenerateZplFromCanvas(Canvas canvas, List<ElementViewModel> elements)
         {
             if (canvas == null)
                 throw new ArgumentNullException(nameof(canvas));
 
             var zplElements = new List<ZplElementBase>();
 
-            ProcessCanvas(canvas, zplElements);
+            ProcessCanvas(elements,canvas, zplElements);
 
             //CanvasExporter.SaveCanvasToFile(canvas, "C:\\temp\\debug.png"); // тест изображения
             return BuildZplString(zplElements);
@@ -46,60 +47,44 @@ namespace ZPLEditor.Utils
 
 
 
-        private static void ProcessCanvas(Canvas canvas, List<ZplElementBase> zplElements)
+        private static void ProcessCanvas(List<ElementViewModel> elements, Canvas canvas, List<ZplElementBase> zplElements)
         {
+            var oldWidth = canvas.Width;
+            var oldHeight = canvas.Height;
+
             // 1. Рассчитываем масштаб
             var scale = Dpi / SourceDpi;
 
-            // 2. Извлекаем все ElementViewModel из дочерних контролов канваса
-            var elements = new List<ElementViewModel>();
+            // 3. Масштабируем все элементы
+            ElementViewModel.ScaleElements(elements, scale);
 
-            foreach (var child in canvas.Children)
-            {
-                if (child is Control control && control.DataContext is ElementViewModel vm)
-                {
-                    elements.Add(vm);
-                }
-            }
+            // 4. Создаём новый Canvas с масштабированными размерами
+            var scaledCanvasWidth = canvas.Width * scale;
+            var scaledCanvasHeight = canvas.Height * scale;
 
-            // 3. Асинхронно применяем масштабирование
-            // ВАЖНО: Это блокирующий вызов. Убедись, что не вызывается в основном UI-потоке, или используй ConfigureAwait(false)
-            try
-            {
-                ApplyScaleAsync(elements, scale).GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Ошибка при масштабировании элементов: {ex.InnerException?.Message ?? ex.Message}");
-            }
+            canvas.Height = scaledCanvasHeight;
+            canvas.Width = scaledCanvasWidth;
 
-            // 4. Теперь рендерим уже масштабированный Canvas
-            var widthInches = canvas.Width / SourceDpi;
-            var heightInches = canvas.Height / SourceDpi;
 
-            var pixelWidth = (int)Math.Ceiling(widthInches * Dpi);
-            var pixelHeight = (int)Math.Ceiling(heightInches * Dpi);
+            // 6. Подготавливаем размеры для рендера
+            var widthInches = scaledCanvasWidth ;
+            var heightInches = scaledCanvasHeight ;
+
+            var pixelWidth = (int)Math.Ceiling(widthInches );
+            var pixelHeight = (int)Math.Ceiling(heightInches );
 
             var pixelSize = new PixelSize(pixelWidth, pixelHeight);
-            var dpi = new Vector(Dpi, Dpi);
+            var dpiVector = new Vector(Dpi, Dpi);
 
-            using var bitmap = new RenderTargetBitmap(pixelSize, dpi);
+            using var bitmap = new RenderTargetBitmap(pixelSize, dpiVector);
 
-            using (var context = bitmap.CreateDrawingContext())
-            {
-                // Теперь контекст рисует уже масштабированные элементы
-                var brush = new VisualBrush(canvas)
-                {
-                    Stretch = Stretch.None,
-                    AlignmentX = AlignmentX.Left,
-                    AlignmentY = AlignmentY.Top
-                };
+            // 7. Рендерим Canvas в битмап
+            bitmap.Render(canvas);
 
-                context.DrawRectangle(brush, null, new Rect(0, 0, canvas.Width, canvas.Height));
-            }
-
+            // 8. Конвертируем в байты
             var data = RenderTargetBitmapToByteArray(bitmap);
 
+            // 9. Добавляем ZPL команды
             try
             {
                 zplElements.Add(new ZplDownloadGraphics('R', "label", data));
@@ -109,57 +94,14 @@ namespace ZPLEditor.Utils
             {
                 Debug.WriteLine($"Ошибка при добавлении ZPL-графики: {ex.Message}");
             }
+
+            canvas.Width = oldWidth;
+            canvas.Height = oldHeight;
         }
 
-        public static async Task<IEnumerable<ElementViewModel>> ApplyScaleAsync(
-    IEnumerable<ElementViewModel> elements,
-    double scale)
-        {
-            var tasks = elements.Select(async element =>
-            {
-                if (element.Type == ElementType.Image && element.OriginalImageData == null && !string.IsNullOrEmpty(element.Path))
-                {
-                    try
-                    {
-                        var bitmap = await Task.Run(() => new Bitmap(element.Path)).ConfigureAwait(false);
-                        element.OriginalImageData = bitmap;
-                        element.OriginalWidth = bitmap.PixelSize.Width;
-                        element.OriginalHeight = bitmap.PixelSize.Height;
 
-                        if (element.Width == 0 || element.Height == 0)
-                        {
-                            element.Width = bitmap.PixelSize.Width;
-                            element.Height = bitmap.PixelSize.Height;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Failed to load image: {element.Path}, Error: {ex.Message}");
-                    }
-                }
 
-                element.X *= scale;
-                element.Y *= scale;
-                element.Width *= scale;
-                element.Height *= scale;
 
-                if (element.OriginalImageData != null && element.OriginalWidth > 0 && element.OriginalHeight > 0)
-                {
-                    element.ScaleX = element.Width / element.OriginalWidth;
-                    element.ScaleY = element.Height / element.OriginalHeight;
-                }
-
-                // Обновляем UI — это в UI-потоке, но мы уже в нём, если вызвали синхронно
-                Canvas.SetLeft(element.Control, element.X);
-                Canvas.SetTop(element.Control, element.Y);
-                element.Control.Width = element.Width;
-                element.Control.Height = element.Height;
-
-                return element;
-            });
-
-            return await Task.WhenAll(tasks).ConfigureAwait(false);
-        }
 
         public static byte[] RenderTargetBitmapToByteArray(RenderTargetBitmap bitmap)
         {
@@ -175,7 +117,7 @@ namespace ZPLEditor.Utils
             {
                 AddEmptyLineBeforeElementStart = true,
                 TargetPrintDpi = Dpi,
-                SourcePrintDpi = Dpi
+                SourcePrintDpi = SourceDpi
             };
 
             var zpl = engine.ToZplString(options);

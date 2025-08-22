@@ -12,6 +12,7 @@ using System.Linq;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
+using ZPLEditor.Utils;
 
 namespace ZPLEditor.ViewModels;
 
@@ -33,6 +34,10 @@ public class ElementViewModel : ReactiveObject, IDisposable
     public Control Control { get; }
 
     // Конструктор
+    public ElementViewModel()
+    {
+
+    }
     public ElementViewModel(
         Control control,
         string name,
@@ -219,65 +224,60 @@ public class ElementViewModel : ReactiveObject, IDisposable
     }
 
     /// <summary>
-    /// Применяет масштаб ко всем элементам: подгружает оригинальные изображения при необходимости и масштабирует размеры и позиции.
+    /// Масштабирует все элементы в коллекции по заданному коэффициенту,
+    /// используя оригинальные изображения высокого разрешения для точного пересчёта размеров.
     /// </summary>
     /// <param name="elements">Коллекция элементов для масштабирования.</param>
-    /// <param name="scale">Масштаб (например, 1.0 = 100%, 2.0 = 200%).</param>
-    /// <returns>Коллекция обновлённых элементов.</returns>
-    public static async Task<IEnumerable<ElementViewModel>> ApplyScaleAsync(
-        IEnumerable<ElementViewModel> elements,
-        double scale)
+    /// <param name="scaleFactor">Коэффициент масштабирования (например, 1.0, 1.5, 2.0 и т.д.)</param>
+    public static IEnumerable<ElementViewModel> ScaleElements(IEnumerable<ElementViewModel> elements, double scaleFactor)
     {
-        var tasks = elements.Select(async element =>
+        foreach (var element in elements)
         {
-            // 1. Подгружаем OriginalImageData, если он null и элемент — изображение
-            if (element.Type == ElementType.Image && element.OriginalImageData == null && !string.IsNullOrEmpty(element.Path))
+            // Создаём новый экземпляр вместо модификации существующего
+            var scaledElement = new ElementViewModel
             {
-                try
-                {
-                    var bitmap = await Task.Run(() => new Bitmap(element.Path));
-                    element.OriginalImageData = bitmap;
-                    element.OriginalWidth = bitmap.PixelSize.Width;
-                    element.OriginalHeight = bitmap.PixelSize.Height;
+                X = element.X * scaleFactor,
+                Y = element.Y * scaleFactor,
+                Width = element.Width,
+                Height = element.Height,
+                OriginalWidth = element.OriginalWidth,
+                OriginalHeight = element.OriginalHeight,
+                ScaleX = element.ScaleX,
+                ScaleY = element.ScaleY,
+                Type = element.Type,
+                Content = element.Content,
+                IsFontSizeVisible = element.IsFontSizeVisible,
+                FontSize = element.IsFontSizeVisible ? element.FontSize * scaleFactor : element.FontSize,
+                Rotation = element.Rotation, // не масштабируется
+                OriginalImageData = element.OriginalImageData, // может потребоваться глубокое копирование, если это массив и т.п.
+                                                               // Скопируйте остальные нужные свойства...
+            };
 
-                    // Пересчитываем текущие размеры, если нужно
-                    if (element.Width == 0 || element.Height == 0)
-                    {
-                        element.Width = bitmap.PixelSize.Width;
-                        element.Height = bitmap.PixelSize.Height;
-                    }
-                }
-                catch (Exception ex)
+            // Для элементов с OriginalImageData пересчитываем размеры на основе оригинала
+            if (scaledElement.OriginalImageData != null && scaledElement.OriginalWidth > 0 && scaledElement.OriginalHeight > 0)
+            {
+                scaledElement.Width = scaledElement.OriginalWidth * scaledElement.ScaleX * scaleFactor;
+                scaledElement.Height = scaledElement.OriginalHeight * scaledElement.ScaleY * scaleFactor;
+
+                // Перегенерация баркода при необходимости
+                if (scaledElement.Type == ElementType.Ean128)
                 {
-                    // Логирование (если есть) или пропуск
-                    Console.WriteLine($"Failed to load image: {element.Path}, Error: {ex.Message}");
-                    // Оставляем как есть
+                    scaledElement.OriginalImageData = BarcodeGenerator.GenerateCode128(scaledElement.Content, (int)scaledElement.Width, (int)scaledElement.Height);
+                }
+                else if (scaledElement.Type == ElementType.Ean13)
+                {
+                    scaledElement.OriginalImageData = BarcodeGenerator.GenerateEan13(scaledElement.Content, (int)scaledElement.Width, (int)scaledElement.Height);
                 }
             }
-
-            // 2. Применяем масштабирование к позиции и размерам
-            element.X *= scale;
-            element.Y *= scale;
-            element.Width *= scale;
-            element.Height *= scale;
-
-            // 3. Пересчитываем ScaleX и ScaleY, если есть оригинальное изображение
-            if (element.OriginalImageData != null && element.OriginalWidth > 0 && element.OriginalHeight > 0)
+            else
             {
-                element.ScaleX = element.Width / element.OriginalWidth;
-                element.ScaleY = element.Height / element.OriginalHeight;
+                // Для текста и других элементов без изображения — масштабируем текущие размеры
+                scaledElement.Width = element.Width * scaleFactor;
+                scaledElement.Height = element.Height * scaleFactor;
             }
 
-            // 4. Обновляем контроль (UI)
-            Canvas.SetLeft(element.Control, element.X);
-            Canvas.SetTop(element.Control, element.Y);
-            element.Control.Width = element.Width;
-            element.Control.Height = element.Height;
-
-            return element;
-        });
-
-        return await Task.WhenAll(tasks);
+            yield return scaledElement;
+        }
     }
 
 

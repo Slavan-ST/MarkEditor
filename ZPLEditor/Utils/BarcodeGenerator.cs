@@ -82,13 +82,13 @@ namespace ZPLEditor.Utils
 
         // Code 128 — часто используется для EAN-128 / GS1-128
         // Ширина зависит от длины данных. Для 20 символов — ~600 px при 304 DPI
-        public static Bitmap GenerateCode128(string data, int? width = null, int height = 300)
+        public static Bitmap GenerateCode128(string data, int? width = null, int height = 3000)
         {
             ValidateInput(data);
 
             // Эмпирическая формула: ~30 px на символ, минимум 300
-            int calculatedWidth = width ?? Math.Max(300, data.Length * 30);
-            calculatedWidth = Math.Max(calculatedWidth, 300); // минимум
+            int calculatedWidth = width ?? Math.Max(3000, data.Length * 300);
+            calculatedWidth = Math.Max(calculatedWidth, 3000); // минимум
 
             return GenerateBarcode(writer =>
             {
@@ -97,7 +97,7 @@ namespace ZPLEditor.Utils
                 {
                     Width = calculatedWidth,
                     Height = height,
-                    Margin = 10,
+                    Margin = 10
                     // Важно: Code 128 чувствителен к разрешению
                 };
             }, data);

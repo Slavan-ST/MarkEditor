@@ -111,12 +111,12 @@ public class MainViewModel : ViewModelBase
 
         PrintZplCommand = ReactiveCommand.Create(() =>
         {
-            string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas);
+            string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas, Elements);
             ZPLUtils.PrintZPL(zpl);
         });
         GenerateZplCommand = ReactiveCommand.Create(() =>
         {
-            string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas);
+            string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas, Elements);
             Debug.WriteLine(zpl);
         });
 
