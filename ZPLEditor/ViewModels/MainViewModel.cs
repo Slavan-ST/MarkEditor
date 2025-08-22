@@ -287,6 +287,8 @@ public class MainViewModel : ViewModelBase
             var elementVm = new ElementViewModel(imageControl, fileName,ElementType.Image, 50, 50, bitmap.PixelSize.Width, bitmap.PixelSize.Height, data);
             Elements.Add(elementVm);
             elementVm.Path = filePath;
+            elementVm.Type = ElementType.Image;
+            elementVm.OriginalImageData = bitmap;
 
             _mainWindow.LabelCanvas.Children.Add(imageControl);
             CurrentElement = elementVm;
@@ -300,7 +302,7 @@ public class MainViewModel : ViewModelBase
     private void AddQrCode()
     {
         var content = $"QR-{LabelName}-{DateTime.Now:HHmmss}";
-        var bitmap = BarcodeGenerator.GenerateQrCode(content, 100, 100);
+        var bitmap = BarcodeGenerator.GenerateQrCode(content);
         AddBarcodeToCanvas(bitmap, "QR", content, ElementType.QrCode);
     }
 
@@ -314,14 +316,14 @@ public class MainViewModel : ViewModelBase
         if (baseNum.Length != 12)
             baseNum = baseNum.Substring(0, 12); // Обрезаем, если вдруг больше
 
-        var bitmap = BarcodeGenerator.GenerateEan13(baseNum, 200, 80);
+        var bitmap = BarcodeGenerator.GenerateEan13(baseNum);
         AddBarcodeToCanvas(bitmap, "EAN13", baseNum, ElementType.Ean13);
     }
 
     private void AddDataMatrix()
     {
         var content = $"DM-X:{LabelWidth:F0},Y:{LabelHeight:F0}";
-        var bitmap = BarcodeGenerator.GenerateDataMatrix(content, 100, 100);
+        var bitmap = BarcodeGenerator.GenerateDataMatrix(content);
         AddBarcodeToCanvas(bitmap, "DataMatrix", content, ElementType.DataMatrix);
     }
 
@@ -330,19 +332,23 @@ public class MainViewModel : ViewModelBase
         //var content = "00046070699704096210";
         //var content = $"[)>{LabelName}|{DateTime.Now:yyMMdd}|{LabelWidth}x{LabelHeight}";
         var content = $"00046070699704096210";
-        var bitmap = BarcodeGenerator.GenerateCode128(content, 200, 80);
+        var bitmap = BarcodeGenerator.GenerateCode128(content);
         AddBarcodeToCanvas(bitmap, "Code128", content, ElementType.Ean128);
     }
 
     // Вспомогательный метод: добавляет баркод как изображение на холст
     private void AddBarcodeToCanvas(Bitmap bitmap, string typeName, string data, ElementType type)
     {
+        // Сохраняем оригинальный размер
+        var originalWidth = bitmap.PixelSize.Width;
+        var originalHeight = bitmap.PixelSize.Height;
+
         var imageControl = new Image
         {
             Source = bitmap,
-            Width = bitmap.PixelSize.Width,
-            Height = bitmap.PixelSize.Height,
-            Stretch = Stretch.Fill,
+            Width = originalWidth,
+            Height = originalHeight,
+            Stretch = Stretch.Uniform, // или UniformToFill, в зависимости от нужд
             IsHitTestVisible = true
         };
 
@@ -357,49 +363,59 @@ public class MainViewModel : ViewModelBase
             $"{typeName}_{Elements.Count + 1}",
             type,
             left, top,
-            bitmap.PixelSize.Width,
-            bitmap.PixelSize.Height,
+            originalWidth,
+            originalHeight,
             null
         )
         {
-            Content = data,
-            Path = $"Generated:{typeName}='{data}'"
+            Content = data, // Только текст! Не изображение
+            Path = $"Generated:{typeName}='{data}'",
+            OriginalImageData = bitmap // ← Добавь в ElementViewModel свойство для хранения оригинала
         };
 
         Elements.Add(elementVm);
         _mainWindow.LabelCanvas.Children.Add(imageControl);
         CurrentElement = elementVm;
 
-        // --- Реактивная перегенерация баркода при изменении Content ---
+        // --- Реактивная перегенерация ТОЛЬКО при изменении Content ---
         elementVm.WhenAnyValue(vm => vm.Content)
             .Where(content => !string.IsNullOrWhiteSpace(content))
-            .Where(_ => !elementVm.IsEditing) // Только если не в процессе редактирования
-            .Throttle(TimeSpan.FromMilliseconds(100)) // Защита от "дребезга"
+            .Where(_ => !elementVm.IsEditing)
+            .Throttle(TimeSpan.FromMilliseconds(100))
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(content =>
+            .Subscribe(async content =>
             {
                 try
                 {
+                    // Перегенерируем ТОЛЬКО если контент изменился
                     Bitmap newBitmap = type switch
                     {
-                        ElementType.QrCode => BarcodeGenerator.GenerateQrCode(content, (int)elementVm.Width, (int)elementVm.Height),
-                        ElementType.Ean13 => BarcodeGenerator.GenerateEan13(content, (int)elementVm.Width, (int)elementVm.Height),
-                        ElementType.DataMatrix => BarcodeGenerator.GenerateDataMatrix(content, (int)elementVm.Width, (int)elementVm.Height),
-                        ElementType.Ean128 or ElementType.Ean128 => BarcodeGenerator.GenerateCode128(content, (int)elementVm.Width, (int)elementVm.Height),
+                        ElementType.QrCode => BarcodeGenerator.GenerateQrCode(content, (int)originalWidth, (int)originalHeight),
+                        ElementType.Ean13 => BarcodeGenerator.GenerateEan13(content, (int)originalWidth, (int)originalHeight),
+                        ElementType.DataMatrix => BarcodeGenerator.GenerateDataMatrix(content, (int)originalWidth, (int)originalHeight),
+                        ElementType.Ean128 => BarcodeGenerator.GenerateCode128(content, (int)originalWidth, (int)originalHeight),
                         _ => throw new NotSupportedException("Unsupported barcode type")
                     };
 
                     imageControl.Source = newBitmap;
-                    imageControl.Width = newBitmap.PixelSize.Width;
-                    imageControl.Height = newBitmap.PixelSize.Height;
-                    elementVm.Width = newBitmap.PixelSize.Width;
-                    elementVm.Height = newBitmap.PixelSize.Height;
-                    elementVm.Path = $"Generated:{typeName}='{content}'"; // Обновляем отображение
+
+                    // Важно: размеры элемента остаются те же, но изображение заменяется
+                    // Если хочешь, можно обновить OriginalImageData
+                    elementVm.OriginalImageData = newBitmap;
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"Ошибка генерации баркода: {ex.Message}");
                 }
+            });
+
+        // --- Привязка изменения размера элемента к размеру ImageControl ---
+        // Когда пользователь меняет размер элемента — просто меняется размер Image, но не исходное изображение
+        elementVm.WhenAnyValue(vm => vm.Width, vm => vm.Height)
+            .Subscribe(_ =>
+            {
+                imageControl.Width = elementVm.Width;
+                imageControl.Height = elementVm.Height;
             });
     }
 

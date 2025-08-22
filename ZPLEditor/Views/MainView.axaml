@@ -153,6 +153,21 @@
 									 Margin="2,0"
 									 HorizontalAlignment="Stretch"/>
 						</StackPanel>
+
+						<!-- Строка: Font Size (показывается, если IsFontSizeVisible = true) -->
+						<StackPanel Orientation="Horizontal" Margin="0,5,0,2" IsVisible="{Binding CurrentElement.IsFontSizeVisible}">
+							<TextBlock Text="Font Size:" Width="60" VerticalAlignment="Center"/>
+							<TextBox Text="{Binding CurrentElement.FontSize, Mode=TwoWay}"
+									 Margin="2,0" Width="50"/>
+						</StackPanel>
+
+						<!-- Строка: Rotation (показывается, если IsRotationVisible = true) -->
+						<StackPanel Orientation="Horizontal" Margin="0,5,0,2" IsVisible="{Binding CurrentElement.IsRotationVisible}">
+							<TextBlock Text="Rotate:" Width="60" VerticalAlignment="Center"/>
+							<TextBox Text="{Binding CurrentElement.Rotation, Mode=TwoWay}"
+									 Margin="2,0" Width="50"/>
+						</StackPanel>
+						
 					</StackPanel>
 					
 					
