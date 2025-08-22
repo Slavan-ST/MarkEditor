@@ -8,23 +8,33 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 using ZPLEditor.Models.DTO;
 using ZPLEditor.Utils.Converters;
 using ZPLEditor.ViewModels;
 
 namespace ZPLEditor.Utils
 {
+    /// <summary>
+    /// Утилита для сериализации и десериализации проекта редактора этикеток.
+    /// Поддерживает сохранение/загрузку в формате JSON с кастомной обработкой бинарных данных.
+    /// </summary>
     public static class ProjectSerializer
     {
+        // === Настройки сериализации JSON ===
         private static readonly JsonSerializerOptions _options = new()
         {
             WriteIndented = true,
             Converters = { new ByteArrayConverter() }
         };
 
+        // === Публичные методы: Save / Load ===
+
+        /// <summary>
+        /// Сохраняет текущий проект в файл.
+        /// </summary>
+        /// <param name="filePath">Путь к файлу для сохранения.</param>
+        /// <param name="viewModel">MainViewModel, содержащий данные проекта.</param>
         public static void SaveProjectInFile(string filePath, MainViewModel viewModel)
         {
             var projectDto = new ProjectDto
@@ -39,91 +49,93 @@ namespace ZPLEditor.Utils
             File.WriteAllText(filePath, json);
         }
 
+        /// <summary>
+        /// Загружает проект из файла без применения к UI.
+        /// </summary>
+        /// <param name="filePath">Путь к файлу проекта.</param>
+        /// <returns>DTO проекта или пустой объект при ошибке.</returns>
         public static ProjectDto LoadProject(string filePath)
         {
             var json = File.ReadAllText(filePath);
             return JsonSerializer.Deserialize<ProjectDto>(json, _options)
-                   ?? new ProjectDto(); // возвращаем пустой проект, если ошибка
+                   ?? new ProjectDto();
         }
 
+        /// <summary>
+        /// Полностью загружает проект из файла и восстанавливает его в UI.
+        /// </summary>
+        /// <param name="filePath">Путь к файлу проекта.</param>
+        /// <param name="viewModel">MainViewModel, в который загружается проект.</param>
         public static void LoadProjectFromFile(string filePath, MainViewModel viewModel)
         {
             var projectDto = LoadProject(filePath);
 
-            // Очищаем текущий холст
-            viewModel.Elements.Clear();
-            viewModel._mainWindow.LabelCanvas.Children.Clear();
+            // Очистка текущего состояния
+            ClearCanvas(viewModel);
 
-            // Восстанавливаем свойства
+            // Восстановление свойств проекта
+            RestoreProjectProperties(viewModel, projectDto);
+
+            // Восстановление элементов
+            RestoreElements(viewModel, projectDto.Elements);
+        }
+
+        // === Внутренние методы: Очистка и восстановление ===
+
+        /// <summary>
+        /// Очищает холст и коллекцию элементов.
+        /// </summary>
+        private static void ClearCanvas(MainViewModel viewModel)
+        {
+            viewModel.Elements.Clear();
+            viewModel._mainWindow?.LabelCanvas?.Children.Clear();
+        }
+
+        /// <summary>
+        /// Восстанавливает основные свойства проекта (имя, размеры).
+        /// </summary>
+        private static void RestoreProjectProperties(MainViewModel viewModel, ProjectDto projectDto)
+        {
             viewModel.LabelName = projectDto.LabelName;
             viewModel.LabelWidth = projectDto.LabelWidth;
             viewModel.LabelHeight = projectDto.LabelHeight;
+        }
 
-            // Восстанавливаем элементы
-            foreach (var dto in projectDto.Elements)
+        /// <summary>
+        /// Восстанавливает все элементы из DTO в UI.
+        /// </summary>
+        private static void RestoreElements(MainViewModel viewModel, List<ElementDataDto> elementDtos)
+        {
+            foreach (var dto in elementDtos)
             {
-                Control control = CreateControlForType(dto.Type);
+                var control = CreateControlForType(dto.Type);
 
-                // Только для текста — делаем TextBox, иначе TextBlock
                 if (dto.Type == ElementType.Text)
                 {
-                    var newTextBox = new TextBox
-                    {
-                        Text = dto.Content,
-                        FontSize = 16,
-                        Width = dto.Width,
-                        Height = dto.Height,
-                        Background = Brushes.Transparent,
-                        Focusable = true
-                    };
-                    control = newTextBox;
-                }
-
-                var vm = dto.ToViewModel(control);
-                viewModel.Elements.Add(vm);
-
-                // Для текста — добавляем логику редактирования (аналогично AddTextBox)
-                if (dto.Type == ElementType.Text && control is TextBox textBox)
-                {
+                    var textBox = CreateEditableTextBox(dto);
+                    control = textBox;
+                    var vm = dto.ToViewModel(textBox);
                     SetupTextBoxEditing(textBox, vm, viewModel);
+                    viewModel.Elements.Add(vm);
                 }
-
-                // Для изображений и баркодов — устанавливаем Source, если есть данные
-                if (control is Image image)
+                else
                 {
-                    if (dto.Data != null && dto.Type == ElementType.Image)
+                    var vm = dto.ToViewModel(control);
+                    viewModel.Elements.Add(vm);
+
+                    if (control is Image image)
                     {
-                        using var ms = new MemoryStream(dto.Data);
-                        image.Source = new Bitmap(ms);
-                    }
-                    else if (dto.Type != ElementType.Image)
-                    {
-                        // Перегенерируем баркод
-                        try
-                        {
-                            var bitmap = dto.Type switch
-                            {
-                                ElementType.QrCode => BarcodeGenerator.GenerateQrCode(dto.Content, (int)dto.Width, (int)dto.Height),
-                                ElementType.Ean13 => BarcodeGenerator.GenerateEan13(dto.Content, (int)dto.Width, (int)dto.Height),
-                                ElementType.DataMatrix => BarcodeGenerator.GenerateDataMatrix(dto.Content, (int)dto.Width, (int)dto.Height),
-                                ElementType.Ean128 => BarcodeGenerator.GenerateCode128(dto.Content, (int)dto.Width, (int)dto.Height),
-                                _ => null
-                            };
-                            if (bitmap != null)
-                            {
-                                image.Source = bitmap;
-                                image.Width = bitmap.PixelSize.Width;
-                                image.Height = bitmap.PixelSize.Height;
-                            }
-                        }
-                        catch { /* ignore */ }
+                        ApplyImageOrBarcode(image, dto);
                     }
                 }
 
-                viewModel._mainWindow.LabelCanvas.Children.Add(control);
+                viewModel._mainWindow?.LabelCanvas?.Children.Add(control);
             }
         }
 
+        /// <summary>
+        /// Настраивает редактирование TextBox (фокус, события, привязка контента).
+        /// </summary>
         private static void SetupTextBoxEditing(TextBox textBox, ElementViewModel vm, MainViewModel mainVm)
         {
             textBox.DoubleTapped += (s, e) => textBox.Focus();
@@ -141,7 +153,7 @@ namespace ZPLEditor.Utils
 
             textBox.KeyDown += (s, e) =>
             {
-                if (e.Key == Key.Enter || e.Key == Key.Escape)
+                if (e.Key is Key.Enter or Key.Escape)
                 {
                     textBox.Focusable = false;
                     textBox.Focusable = true;
@@ -150,13 +162,21 @@ namespace ZPLEditor.Utils
             };
 
             vm.WhenAnyValue(x => x.Content)
-                .Where(content => !vm.IsEditing)
-                .Subscribe(content =>
-                {
-                    if (textBox.Text != content)
-                        textBox.Text = content;
-                });
+              .Where(content => !vm.IsEditing)
+              .Subscribe(content =>
+              {
+                  if (textBox.Text != content)
+                      textBox.Text = content;
+              });
         }
+
+        // === Создание элементов UI ===
+
+        /// <summary>
+        /// Создаёт базовый UI-элемент в зависимости от типа элемента.
+        /// </summary>
+        /// <param name="type">Тип элемента.</param>
+        /// <returns>Новый Control.</returns>
         public static Control CreateControlForType(ElementType type)
         {
             return type switch
@@ -169,6 +189,59 @@ namespace ZPLEditor.Utils
                 ElementType.DataMatrix => new Image(),
                 _ => new Border() // fallback
             };
+        }
+
+        /// <summary>
+        /// Создаёт редактируемый TextBox на основе DTO.
+        /// </summary>
+        private static TextBox CreateEditableTextBox(ElementDataDto dto)
+        {
+            return new TextBox
+            {
+                Text = dto.Content,
+                FontSize = 16,
+                Width = dto.Width,
+                Height = dto.Height,
+                Background = Brushes.Transparent,
+                Focusable = true
+            };
+        }
+
+        /// <summary>
+        /// Устанавливает изображение или генерирует баркод в зависимости от типа.
+        /// </summary>
+        private static void ApplyImageOrBarcode(Image image, ElementDataDto dto)
+        {
+            if (dto.Data != null && dto.Type == ElementType.Image)
+            {
+                using var ms = new MemoryStream(dto.Data);
+                image.Source = new Bitmap(ms);
+            }
+            else
+            {
+                try
+                {
+                    var bitmap = dto.Type switch
+                    {
+                        ElementType.QrCode => BarcodeGenerator.GenerateQrCode(dto.Content, (int)dto.Width, (int)dto.Height),
+                        ElementType.Ean13 => BarcodeGenerator.GenerateEan13(dto.Content, (int)dto.Width, (int)dto.Height),
+                        ElementType.DataMatrix => BarcodeGenerator.GenerateDataMatrix(dto.Content, (int)dto.Width, (int)dto.Height),
+                        ElementType.Ean128 => BarcodeGenerator.GenerateCode128(dto.Content, (int)dto.Width, (int)dto.Height),
+                        _ => null
+                    };
+
+                    if (bitmap != null)
+                    {
+                        image.Source = bitmap;
+                        image.Width = bitmap.PixelSize.Width;
+                        image.Height = bitmap.PixelSize.Height;
+                    }
+                }
+                catch
+                {
+                    // Игнорируем ошибки генерации баркода
+                }
+            }
         }
     }
 }

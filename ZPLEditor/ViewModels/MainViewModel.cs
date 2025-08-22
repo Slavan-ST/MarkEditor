@@ -1,4 +1,5 @@
-﻿using Avalonia;
+﻿// File: MainViewModel.cs
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -33,15 +34,9 @@ namespace ZPLEditor.ViewModels;
 /// </summary>
 public class MainViewModel : ViewModelBase
 {
-    public readonly MainView _mainWindow;
+    #region Поля
 
-    // --- Данные и состояние ---
-    [Reactive] public List<ElementViewModel> Elements { get; set; } = new();
-    [Reactive] public ElementViewModel? CurrentElement { get; set; } = null;
-    [Reactive] public bool IsCurrentElement { get; set; } = false;
-    [Reactive] public double LabelWidth { get; set; } = 100;
-    [Reactive] public double LabelHeight { get; set; } = 100;
-    [Reactive] public string LabelName { get; set; } = string.Empty;
+    public readonly MainView _mainWindow;
 
     /// <summary>
     /// Текущий элемент, который перетаскивается.
@@ -53,41 +48,37 @@ public class MainViewModel : ViewModelBase
     /// </summary>
     private Point _startPoint;
 
+    #endregion
 
-    // --- Команды ---
-    /// <summary>
-    /// Команда добавления текстового элемента.
-    /// </summary>
+    #region Свойства (Reactive)
+
+    [Reactive] public List<ElementViewModel> Elements { get; set; } = new();
+    [Reactive] public ElementViewModel? CurrentElement { get; set; } = null;
+    [Reactive] public bool IsCurrentElement { get; set; } = false;
+    [Reactive] public double LabelWidth { get; set; } = 100;
+    [Reactive] public double LabelHeight { get; set; } = 100;
+    [Reactive] public string LabelName { get; set; } = string.Empty;
+
+    #endregion
+
+    #region Команды
+
     public ReactiveCommand<Unit, Unit> AddTextCommand { get; }
-
-    /// <summary>
-    /// Команда добавления изображения.
-    /// </summary>
     public ReactiveCommand<Unit, Unit> AddImageCommand { get; }
-
-    /// <summary>
-    /// Команда генерации ZPL-кода.
-    /// </summary>
-    public ReactiveCommand<Unit, Unit> GenerateZplCommand { get; }
-
-    /// <summary>
-    /// Команда печати ZPL.
-    /// </summary>
-    public ReactiveCommand<Unit, Unit> PrintZplCommand { get; }
-
-    /// <summary>
-    /// Команда удаления элемента.
-    /// </summary>
-    public ReactiveCommand<ElementViewModel, Unit> RemoveElementCommand { get; }
     public ReactiveCommand<Unit, Unit> AddQrCodeCommand { get; }
     public ReactiveCommand<Unit, Unit> AddEan13Command { get; }
     public ReactiveCommand<Unit, Unit> AddDataMatrixCommand { get; }
     public ReactiveCommand<Unit, Unit> AddCode128Command { get; }
+    public ReactiveCommand<Unit, Unit> GenerateZplCommand { get; }
+    public ReactiveCommand<Unit, Unit> PrintZplCommand { get; }
+    public ReactiveCommand<ElementViewModel, Unit> RemoveElementCommand { get; }
     public ReactiveCommand<Unit, Unit> SaveCommand { get; }
     public ReactiveCommand<Unit, Unit> LoadCommand { get; }
 
+    #endregion
 
-    // --- Конструктор ---
+    #region Конструктор
+
     /// <summary>
     /// Инициализирует новый экземпляр <see cref="MainViewModel"/>.
     /// </summary>
@@ -97,7 +88,9 @@ public class MainViewModel : ViewModelBase
         _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
 
         // Инициализация команд
-        // В конструкторе MainViewModel после других команд
+        AddTextCommand = ReactiveCommand.Create(AddTextBox);
+        AddImageCommand = ReactiveCommand.Create(AddImage);
+
         AddQrCodeCommand = ReactiveCommand.Create(AddQrCode);
         AddEan13Command = ReactiveCommand.Create(AddEan13);
         AddDataMatrixCommand = ReactiveCommand.Create(AddDataMatrix);
@@ -106,32 +99,26 @@ public class MainViewModel : ViewModelBase
         SaveCommand = ReactiveCommand.CreateFromTask(Save);
         LoadCommand = ReactiveCommand.CreateFromTask(Load);
 
-        AddTextCommand = ReactiveCommand.Create(AddTextBox);
-        AddImageCommand = ReactiveCommand.Create(AddImage);
-
-        PrintZplCommand = ReactiveCommand.Create(() =>
-        {
-            string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas, Elements);
-            ZPLUtils.PrintZPL(zpl);
-        });
         GenerateZplCommand = ReactiveCommand.Create(() =>
         {
             string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas, Elements);
             Debug.WriteLine(zpl);
         });
 
+        PrintZplCommand = ReactiveCommand.Create(() =>
+        {
+            string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas, Elements);
+            ZPLUtils.PrintZPL(zpl);
+        });
+
         RemoveElementCommand = ReactiveCommand.Create<ElementViewModel>(RemoveElement);
 
-        // Подписка на события холста
-        _mainWindow.LabelCanvas.AddHandler(
-            InputElement.PointerPressedEvent,
-            Canvas_PointerPressed,
-            RoutingStrategies.Tunnel);
-
+        // Привязка CurrentElement к IsCurrentElement
         this.WhenAnyValue(x => x.CurrentElement)
             .Select(element => element != null)
             .BindTo(this, x => x.IsCurrentElement);
 
+        // Валидация размеров этикетки
         this.WhenAnyValue(x => x.LabelWidth)
             .Where(w => w > 0)
             .Subscribe(w => LabelWidth = w);
@@ -140,13 +127,23 @@ public class MainViewModel : ViewModelBase
             .Where(h => h > 0)
             .Subscribe(h => LabelHeight = h);
 
+        // Подписка на события холста
+        _mainWindow.LabelCanvas.AddHandler(
+            InputElement.PointerPressedEvent,
+            Canvas_PointerPressed,
+            RoutingStrategies.Tunnel);
+
         _mainWindow.LabelCanvas.PointerMoved += HandlePointerMoved;
         _mainWindow.LabelCanvas.PointerReleased += HandlePointerReleased;
     }
 
+    #endregion
 
-    // --- Работа с элементами на холсте ---
-    #region Сохранение/загрузка этикетки
+    #region Сохранение и загрузка проекта
+
+    /// <summary>
+    /// Асинхронно сохраняет текущий проект в JSON-файл.
+    /// </summary>
     public async Task Save()
     {
         try
@@ -164,6 +161,9 @@ public class MainViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Асинхронно загружает проект из JSON-файла.
+    /// </summary>
     public async Task Load()
     {
         try
@@ -182,6 +182,7 @@ public class MainViewModel : ViewModelBase
     }
 
     #endregion
+
     #region Добавление элементов
 
     /// <summary>
@@ -211,13 +212,13 @@ public class MainViewModel : ViewModelBase
         _mainWindow.LabelCanvas.Children.Add(textBox);
         CurrentElement = elementVm;
 
-        // --- Управление редактированием ---
+        // Обработчики событий редактирования
         void OnTextBoxLostFocus(object sender, RoutedEventArgs e)
         {
             if (sender is TextBox tb && elementVm.IsEditing)
             {
                 elementVm.IsEditing = false;
-                elementVm.Content = tb.Text; // Сохраняем только здесь
+                elementVm.Content = tb.Text;
             }
         }
 
@@ -225,9 +226,9 @@ public class MainViewModel : ViewModelBase
         {
             if (e.Key == Key.Enter || e.Key == Key.Escape)
             {
-                textBox.LostFocus -= OnTextBoxLostFocus; // Избегаем дублирования
+                textBox.LostFocus -= OnTextBoxLostFocus;
                 textBox.LostFocus += OnTextBoxLostFocus;
-                textBox.Focusable = false; // Снимаем фокус
+                textBox.Focusable = false;
                 textBox.Focusable = true;
                 elementVm.IsEditing = false;
             }
@@ -249,7 +250,7 @@ public class MainViewModel : ViewModelBase
         textBox.LostFocus += OnTextBoxLostFocus;
         textBox.KeyDown += OnTextBoxKeyDown;
 
-        // Реактивное обновление Text из Content (только когда VM меняет Content)
+        // Реактивное обновление текста из VM
         elementVm.WhenAnyValue(vm => vm.Content)
             .Where(content => !elementVm.IsEditing)
             .Subscribe(content =>
@@ -284,12 +285,22 @@ public class MainViewModel : ViewModelBase
             Canvas.SetTop(imageControl, 50);
 
             var data = File.ReadAllBytes(filePath);
-            var elementVm = new ElementViewModel(imageControl, fileName,ElementType.Image, 50, 50, bitmap.PixelSize.Width, bitmap.PixelSize.Height, data);
-            Elements.Add(elementVm);
-            elementVm.Path = filePath;
-            elementVm.Type = ElementType.Image;
-            elementVm.OriginalImageData = bitmap;
+            var elementVm = new ElementViewModel(
+                imageControl,
+                fileName,
+                ElementType.Image,
+                50,
+                50,
+                bitmap.PixelSize.Width,
+                bitmap.PixelSize.Height,
+                data
+            )
+            {
+                Path = filePath,
+                OriginalImageData = bitmap
+            };
 
+            Elements.Add(elementVm);
             _mainWindow.LabelCanvas.Children.Add(imageControl);
             CurrentElement = elementVm;
         }
@@ -299,6 +310,9 @@ public class MainViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Добавляет QR-код.
+    /// </summary>
     private void AddQrCode()
     {
         var content = $"QR-{LabelName}-{DateTime.Now:HHmmss}";
@@ -306,20 +320,24 @@ public class MainViewModel : ViewModelBase
         AddBarcodeToCanvas(bitmap, "QR", content, ElementType.QrCode);
     }
 
+    /// <summary>
+    /// Добавляет штрих-код EAN-13.
+    /// </summary>
     private void AddEan13()
     {
         var now = DateTime.Now;
-        // ГГММДДЧЧММСС → берём часть
         var baseNum = $"{now.Year % 100:D2}{now.Month:D2}{now.Day:D2}{now.Hour:D2}{now.Minute:D2}{now.Second:D2}";
-        // Пример: 250315143045 → 12 цифр
 
         if (baseNum.Length != 12)
-            baseNum = baseNum.Substring(0, 12); // Обрезаем, если вдруг больше
+            baseNum = baseNum.Substring(0, 12);
 
         var bitmap = BarcodeGenerator.GenerateEan13(baseNum);
         AddBarcodeToCanvas(bitmap, "EAN13", baseNum, ElementType.Ean13);
     }
 
+    /// <summary>
+    /// Добавляет DataMatrix-код.
+    /// </summary>
     private void AddDataMatrix()
     {
         var content = $"DM-X:{LabelWidth:F0},Y:{LabelHeight:F0}";
@@ -327,19 +345,25 @@ public class MainViewModel : ViewModelBase
         AddBarcodeToCanvas(bitmap, "DataMatrix", content, ElementType.DataMatrix);
     }
 
+    /// <summary>
+    /// Добавляет штрих-код Code128 (EAN128).
+    /// </summary>
     private void AddCode128()
     {
-        //var content = "00046070699704096210";
-        //var content = $"[)>{LabelName}|{DateTime.Now:yyMMdd}|{LabelWidth}x{LabelHeight}";
-        var content = $"00046070699704096210";
+        var content = "00046070699704096210";
         var bitmap = BarcodeGenerator.GenerateCode128(content);
         AddBarcodeToCanvas(bitmap, "Code128", content, ElementType.Ean128);
     }
 
-    // Вспомогательный метод: добавляет баркод как изображение на холст
+    /// <summary>
+    /// Вспомогательный метод: добавляет баркод как изображение на холст.
+    /// </summary>
+    /// <param name="bitmap">Изображение баркода.</param>
+    /// <param name="typeName">Тип элемента (например, QR, EAN13).</param>
+    /// <param name="data">Содержимое баркода.</param>
+    /// <param name="type">Тип элемента.</param>
     private void AddBarcodeToCanvas(Bitmap bitmap, string typeName, string data, ElementType type)
     {
-        // Сохраняем оригинальный размер
         var originalWidth = bitmap.PixelSize.Width;
         var originalHeight = bitmap.PixelSize.Height;
 
@@ -348,7 +372,7 @@ public class MainViewModel : ViewModelBase
             Source = bitmap,
             Width = originalWidth,
             Height = originalHeight,
-            Stretch = Stretch.Uniform, // или UniformToFill, в зависимости от нужд
+            Stretch = Stretch.Uniform,
             IsHitTestVisible = true
         };
 
@@ -362,22 +386,23 @@ public class MainViewModel : ViewModelBase
             imageControl,
             $"{typeName}_{Elements.Count + 1}",
             type,
-            left, top,
+            left,
+            top,
             originalWidth,
             originalHeight,
             null
         )
         {
-            Content = data, // Только текст! Не изображение
+            Content = data,
             Path = $"Generated:{typeName}='{data}'",
-            OriginalImageData = bitmap // ← Добавь в ElementViewModel свойство для хранения оригинала
+            OriginalImageData = bitmap
         };
 
         Elements.Add(elementVm);
         _mainWindow.LabelCanvas.Children.Add(imageControl);
         CurrentElement = elementVm;
 
-        // --- Реактивная перегенерация ТОЛЬКО при изменении Content ---
+        // Реактивная перегенерация при изменении Content
         elementVm.WhenAnyValue(vm => vm.Content)
             .Where(content => !string.IsNullOrWhiteSpace(content))
             .Where(_ => !elementVm.IsEditing)
@@ -387,7 +412,6 @@ public class MainViewModel : ViewModelBase
             {
                 try
                 {
-                    // Перегенерируем ТОЛЬКО если контент изменился
                     Bitmap newBitmap = type switch
                     {
                         ElementType.QrCode => BarcodeGenerator.GenerateQrCode(content, (int)originalWidth, (int)originalHeight),
@@ -398,9 +422,6 @@ public class MainViewModel : ViewModelBase
                     };
 
                     imageControl.Source = newBitmap;
-
-                    // Важно: размеры элемента остаются те же, но изображение заменяется
-                    // Если хочешь, можно обновить OriginalImageData
                     elementVm.OriginalImageData = newBitmap;
                 }
                 catch (Exception ex)
@@ -409,8 +430,7 @@ public class MainViewModel : ViewModelBase
                 }
             });
 
-        // --- Привязка изменения размера элемента к размеру ImageControl ---
-        // Когда пользователь меняет размер элемента — просто меняется размер Image, но не исходное изображение
+        // Привязка размеров элемента к контрольному изображению
         elementVm.WhenAnyValue(vm => vm.Width, vm => vm.Height)
             .Subscribe(_ =>
             {
@@ -419,12 +439,9 @@ public class MainViewModel : ViewModelBase
             });
     }
 
-
-
     #endregion
 
-
-    #region Обработка перетаскивания элементов
+    #region Обработка перетаскивания
 
     /// <summary>
     /// Обработчик нажатия на холст — определяет, по какому элементу кликнули.
@@ -433,8 +450,7 @@ public class MainViewModel : ViewModelBase
     {
         var pos = e.GetPosition(_mainWindow.LabelCanvas);
         var hitControl = _mainWindow.LabelCanvas.InputHitTest(pos) as Control;
-
-        Control actualElement = FindParentControlInCanvas(hitControl);
+        Control? actualElement = FindParentControlInCanvas(hitControl);
 
         if (actualElement == null) return;
 
@@ -449,7 +465,6 @@ public class MainViewModel : ViewModelBase
                 e.Pointer.Capture(_mainWindow.LabelCanvas);
                 e.Handled = true;
 
-                // Устанавливаем текущий элемент при клике
                 var vm = Elements.FirstOrDefault(x => x.Control == actualElement);
                 if (vm != null)
                 {
@@ -462,7 +477,6 @@ public class MainViewModel : ViewModelBase
                     tb.Focus();
                 e.Handled = true;
 
-                // Двойной клик — тоже делаем элемент текущим
                 var vm = Elements.FirstOrDefault(x => x.Control == actualElement);
                 if (vm != null)
                 {
@@ -473,11 +487,9 @@ public class MainViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Находит ближайший родительский Control, который является прямым дочерним элементом холста.
+    /// Находит ближайший родительский Control, который является дочерним холста.
     /// </summary>
-    /// <param name="start">Начальный элемент для поиска.</param>
-    /// <returns>Найденный элемент или null.</returns>
-    private Control? FindParentControlInCanvas(Control start)
+    private Control? FindParentControlInCanvas(Control? start)
     {
         var current = start;
         while (current != null)
@@ -505,7 +517,6 @@ public class MainViewModel : ViewModelBase
         Canvas.SetLeft(_draggedElement, left);
         Canvas.SetTop(_draggedElement, top);
 
-        // Найдём соответствующий ElementViewModel и обновим его
         var vm = Elements.FirstOrDefault(x => x.Control == _draggedElement);
         if (vm != null)
         {
@@ -526,7 +537,6 @@ public class MainViewModel : ViewModelBase
     }
 
     #endregion
-
 
     #region Удаление элементов
 
