@@ -317,7 +317,7 @@ public class MainViewModel : ViewModelBase
     {
         var content = $"QR-{LabelName}-{DateTime.Now:HHmmss}";
         var bitmap = BarcodeGenerator.GenerateQrCode(content);
-        AddBarcodeToCanvas(bitmap, "QR", content, ElementType.QrCode);
+        var control = AddBarcodeToCanvas(bitmap, "QR", content, ElementType.QrCode);
     }
 
     /// <summary>
@@ -332,7 +332,7 @@ public class MainViewModel : ViewModelBase
             baseNum = baseNum.Substring(0, 12);
 
         var bitmap = BarcodeGenerator.GenerateEan13(baseNum);
-        AddBarcodeToCanvas(bitmap, "EAN13", baseNum, ElementType.Ean13);
+        var control = AddBarcodeToCanvas(bitmap, "EAN13", baseNum, ElementType.Ean13);
     }
 
     /// <summary>
@@ -342,7 +342,7 @@ public class MainViewModel : ViewModelBase
     {
         var content = $"DM-X:{LabelWidth:F0},Y:{LabelHeight:F0}";
         var bitmap = BarcodeGenerator.GenerateDataMatrix(content);
-        AddBarcodeToCanvas(bitmap, "DataMatrix", content, ElementType.DataMatrix);
+        var control = AddBarcodeToCanvas(bitmap, "DataMatrix", content, ElementType.DataMatrix);
     }
 
     /// <summary>
@@ -352,7 +352,7 @@ public class MainViewModel : ViewModelBase
     {
         var content = "00046070699704096210";
         var bitmap = BarcodeGenerator.GenerateCode128(content);
-        AddBarcodeToCanvas(bitmap, "Code128", content, ElementType.Ean128);
+        var control = AddBarcodeToCanvas(bitmap, "Code128", content, ElementType.Ean128);
     }
 
     /// <summary>
@@ -362,7 +362,7 @@ public class MainViewModel : ViewModelBase
     /// <param name="typeName">Тип элемента (например, QR, EAN13).</param>
     /// <param name="data">Содержимое баркода.</param>
     /// <param name="type">Тип элемента.</param>
-    private void AddBarcodeToCanvas(Bitmap bitmap, string typeName, string data, ElementType type)
+    private ElementViewModel AddBarcodeToCanvas(Bitmap bitmap, string typeName, string data, ElementType type)
     {
         var originalWidth = bitmap.PixelSize.Width;
         var originalHeight = bitmap.PixelSize.Height;
@@ -408,7 +408,7 @@ public class MainViewModel : ViewModelBase
             .Where(_ => !elementVm.IsEditing)
             .Throttle(TimeSpan.FromMilliseconds(100))
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(async content =>
+            .Subscribe( content =>
             {
                 try
                 {
@@ -437,6 +437,8 @@ public class MainViewModel : ViewModelBase
                 imageControl.Width = elementVm.Width;
                 imageControl.Height = elementVm.Height;
             });
+
+        return elementVm;
     }
 
     #endregion

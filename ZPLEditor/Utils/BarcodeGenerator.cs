@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using ZXing;
 using ZXing.Common;
+using ZXing.SkiaSharp.Rendering;
 
 namespace ZPLEditor.Utils
 {
@@ -64,8 +65,8 @@ namespace ZPLEditor.Utils
             }, ean13);
         }
 
-        // Data Matrix: минимум 10×10 мм → 120×120 px, но лучше 150×150
-        public static Bitmap GenerateDataMatrix(string text, int width = 150, int height = 150)
+        // Data Matrix: минимум 10×10 мм → 120×120 px, но лучше 200×200
+        public static Bitmap GenerateDataMatrix(string text, int width = 200, int height = 200)
         {
             ValidateInput(text);
             return GenerateBarcode(writer =>
@@ -81,14 +82,14 @@ namespace ZPLEditor.Utils
         }
 
         // Code 128 — часто используется для EAN-128 / GS1-128
-        // Ширина зависит от длины данных. Для 20 символов — ~600 px при 304 DPI
-        public static Bitmap GenerateCode128(string data, int? width = null, int height = 3000)
+        // Ширина зависит от длины данных. Для 20 символов — ~800 px при 304 DPI
+        public static Bitmap GenerateCode128(string data, int? width = 800, int height = 150)
         {
             ValidateInput(data);
 
-            // Эмпирическая формула: ~30 px на символ, минимум 300
-            int calculatedWidth = width ?? Math.Max(3000, data.Length * 300);
-            calculatedWidth = Math.Max(calculatedWidth, 3000); // минимум
+            // Эмпирическая формула: ~40 px на символ, минимум 800
+            int calculatedWidth = width ?? Math.Max(800, data.Length * 40);
+            calculatedWidth = Math.Max(calculatedWidth, 800); // минимум
 
             return GenerateBarcode(writer =>
             {
@@ -98,7 +99,6 @@ namespace ZPLEditor.Utils
                     Width = calculatedWidth,
                     Height = height,
                     Margin = 10
-                    // Важно: Code 128 чувствителен к разрешению
                 };
             }, data);
         }
