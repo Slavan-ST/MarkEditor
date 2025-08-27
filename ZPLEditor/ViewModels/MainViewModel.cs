@@ -23,6 +23,7 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using ZPLEditor.Services;
 using ZPLEditor.Utils;
 using ZPLEditor.Views;
 
@@ -36,6 +37,7 @@ public class MainViewModel : ViewModelBase
 {
     #region Поля
 
+    private readonly IElementService _elementService;
     public readonly MainView _mainWindow;
 
     /// <summary>
@@ -43,21 +45,34 @@ public class MainViewModel : ViewModelBase
     /// </summary>
     private Control? _draggedElement;
 
-    /// <summary>
-    /// Начальная точка перетаскивания.
-    /// </summary>
-    private Point _startPoint;
-
     #endregion
 
     #region Свойства (Reactive)
 
-    [Reactive] public List<ElementViewModel> Elements { get; set; } = new();
-    [Reactive] public ElementViewModel? CurrentElement { get; set; } = null;
-    [Reactive] public bool IsCurrentElement { get; set; } = false;
-    [Reactive] public double LabelWidth { get; set; } = 100;
-    [Reactive] public double LabelHeight { get; set; } = 100;
-    [Reactive] public string LabelName { get; set; } = string.Empty;
+    /// <summary>
+    /// Коллекция элементов на холсте. Управляется через сервис.
+    /// </summary>
+    public ObservableCollection<ElementViewModel> Elements => _elementService.Elements;
+
+    [Reactive]
+    public ElementViewModel? CurrentElement { get; set; }
+
+    [Reactive]
+    public bool IsCurrentElement { get; set; } = false;
+
+    [Reactive]
+    public double LabelWidth { get; set; } = 100;
+
+    [Reactive]
+    public double LabelHeight { get; set; } = 100;
+
+    [Reactive]
+    public string LabelName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Активатор для управления жизненным циклом представлений.
+    /// </summary>
+    public ViewModelActivator Activator { get; } = new();
 
     #endregion
 
@@ -83,31 +98,31 @@ public class MainViewModel : ViewModelBase
     /// Инициализирует новый экземпляр <see cref="MainViewModel"/>.
     /// </summary>
     /// <param name="mainWindow">Ссылка на основное окно для доступа к элементам UI.</param>
-    public MainViewModel(MainView mainWindow)
+    /// <param name="elementService">Сервис управления элементами (опционально).</param>
+    public MainViewModel(MainView mainWindow, IElementService? elementService = null)
     {
         _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
+        _elementService = elementService ?? new ElementService(_mainWindow.LabelCanvas);
 
         // Инициализация команд
         AddTextCommand = ReactiveCommand.Create(AddTextBox);
-        AddImageCommand = ReactiveCommand.Create(AddImage);
-
+        AddImageCommand = ReactiveCommand.CreateFromTask(AddImageAsync);
         AddQrCodeCommand = ReactiveCommand.Create(AddQrCode);
         AddEan13Command = ReactiveCommand.Create(AddEan13);
         AddDataMatrixCommand = ReactiveCommand.Create(AddDataMatrix);
         AddCode128Command = ReactiveCommand.Create(AddCode128);
-
         SaveCommand = ReactiveCommand.CreateFromTask(Save);
         LoadCommand = ReactiveCommand.CreateFromTask(Load);
 
         GenerateZplCommand = ReactiveCommand.Create(() =>
         {
-            string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas, Elements);
+            string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas, Elements.ToList());
             Debug.WriteLine(zpl);
         });
 
         PrintZplCommand = ReactiveCommand.Create(() =>
         {
-            string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas, Elements);
+            string zpl = ZPLUtils.GenerateZplFromCanvas(_mainWindow.LabelCanvas, Elements.ToList());
             ZPLUtils.PrintZPL(zpl);
         });
 
@@ -117,6 +132,10 @@ public class MainViewModel : ViewModelBase
         this.WhenAnyValue(x => x.CurrentElement)
             .Select(element => element != null)
             .BindTo(this, x => x.IsCurrentElement);
+
+        // Синхронизация CurrentElement с сервисом
+        this.WhenAnyValue(x => x.CurrentElement)
+            .Subscribe(currentElement => _elementService.SetCurrentElement(currentElement));
 
         // Валидация размеров этикетки
         this.WhenAnyValue(x => x.LabelWidth)
@@ -207,12 +226,10 @@ public class MainViewModel : ViewModelBase
         {
             Content = "Edit Me"
         };
-        Elements.Add(elementVm);
 
-        _mainWindow.LabelCanvas.Children.Add(textBox);
-        CurrentElement = elementVm;
+        _elementService.AddElement(elementVm, textBox, _mainWindow.LabelCanvas);
 
-        // Обработчики событий редактирования
+        // Обработчики редактирования
         void OnTextBoxLostFocus(object sender, RoutedEventArgs e)
         {
             if (sender is TextBox tb && elementVm.IsEditing)
@@ -224,10 +241,8 @@ public class MainViewModel : ViewModelBase
 
         void OnTextBoxKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Enter || e.Key == Key.Escape)
+            if (e.Key is Key.Enter or Key.Escape)
             {
-                textBox.LostFocus -= OnTextBoxLostFocus;
-                textBox.LostFocus += OnTextBoxLostFocus;
                 textBox.Focusable = false;
                 textBox.Focusable = true;
                 elementVm.IsEditing = false;
@@ -263,9 +278,11 @@ public class MainViewModel : ViewModelBase
     /// <summary>
     /// Асинхронно добавляет изображение на холст через диалог выбора файла.
     /// </summary>
-    private async void AddImage()
+    private async Task AddImageAsync()
     {
-        var filePath = await FileManager.OpenImageFileAsync((Window)_mainWindow.GetVisualRoot());
+        var window = (Window)_mainWindow.GetVisualRoot();
+        var filePath = await FileManager.OpenImageFileAsync(window);
+        if (string.IsNullOrEmpty(filePath)) return;
 
         try
         {
@@ -300,9 +317,7 @@ public class MainViewModel : ViewModelBase
                 OriginalImageData = bitmap
             };
 
-            Elements.Add(elementVm);
-            _mainWindow.LabelCanvas.Children.Add(imageControl);
-            CurrentElement = elementVm;
+            _elementService.AddElement(elementVm, imageControl, _mainWindow.LabelCanvas);
         }
         catch (Exception ex)
         {
@@ -313,12 +328,11 @@ public class MainViewModel : ViewModelBase
     /// <summary>
     /// Добавляет QR-код.
     /// </summary>
-    private void AddQrCode()
-    {
-        var content = $"QR-{LabelName}-{DateTime.Now:HHmmss}";
-        var bitmap = BarcodeGenerator.GenerateQrCode(content);
-        var control = AddBarcodeToCanvas(bitmap, "QR", content, ElementType.QrCode);
-    }
+    private void AddQrCode() => AddBarcodeToCanvas(
+        BarcodeGenerator.GenerateQrCode($"QR-{LabelName}-{DateTime.Now:HHmmss}"),
+        "QR",
+        $"QR-{LabelName}-{DateTime.Now:HHmmss}",
+        ElementType.QrCode);
 
     /// <summary>
     /// Добавляет штрих-код EAN-13.
@@ -327,12 +341,13 @@ public class MainViewModel : ViewModelBase
     {
         var now = DateTime.Now;
         var baseNum = $"{now.Year % 100:D2}{now.Month:D2}{now.Day:D2}{now.Hour:D2}{now.Minute:D2}{now.Second:D2}";
+        baseNum = baseNum.Length > 12 ? baseNum.Substring(0, 12) : baseNum.PadRight(12, '0');
 
-        if (baseNum.Length != 12)
-            baseNum = baseNum.Substring(0, 12);
-
-        var bitmap = BarcodeGenerator.GenerateEan13(baseNum);
-        var control = AddBarcodeToCanvas(bitmap, "EAN13", baseNum, ElementType.Ean13);
+        AddBarcodeToCanvas(
+            BarcodeGenerator.GenerateEan13(baseNum),
+            "EAN13",
+            baseNum,
+            ElementType.Ean13);
     }
 
     /// <summary>
@@ -341,8 +356,11 @@ public class MainViewModel : ViewModelBase
     private void AddDataMatrix()
     {
         var content = $"DM-X:{LabelWidth:F0},Y:{LabelHeight:F0}";
-        var bitmap = BarcodeGenerator.GenerateDataMatrix(content);
-        var control = AddBarcodeToCanvas(bitmap, "DataMatrix", content, ElementType.DataMatrix);
+        AddBarcodeToCanvas(
+            BarcodeGenerator.GenerateDataMatrix(content),
+            "DataMatrix",
+            content,
+            ElementType.DataMatrix);
     }
 
     /// <summary>
@@ -350,9 +368,12 @@ public class MainViewModel : ViewModelBase
     /// </summary>
     private void AddCode128()
     {
-        var content = "00046070699704096210";
-        var bitmap = BarcodeGenerator.GenerateCode128(content);
-        var control = AddBarcodeToCanvas(bitmap, "Code128", content, ElementType.Ean128);
+        const string content = "00046070699704096210";
+        AddBarcodeToCanvas(
+            BarcodeGenerator.GenerateCode128(content),
+            "Code128",
+            content,
+            ElementType.Ean128);
     }
 
     /// <summary>
@@ -362,7 +383,7 @@ public class MainViewModel : ViewModelBase
     /// <param name="typeName">Тип элемента (например, QR, EAN13).</param>
     /// <param name="data">Содержимое баркода.</param>
     /// <param name="type">Тип элемента.</param>
-    private ElementViewModel AddBarcodeToCanvas(Bitmap bitmap, string typeName, string data, ElementType type)
+    private void AddBarcodeToCanvas(Bitmap bitmap, string typeName, string data, ElementType type)
     {
         var originalWidth = bitmap.PixelSize.Width;
         var originalHeight = bitmap.PixelSize.Height;
@@ -398,9 +419,7 @@ public class MainViewModel : ViewModelBase
             OriginalImageData = bitmap
         };
 
-        Elements.Add(elementVm);
-        _mainWindow.LabelCanvas.Children.Add(imageControl);
-        CurrentElement = elementVm;
+        _elementService.AddElement(elementVm, imageControl, _mainWindow.LabelCanvas);
 
         // Реактивная перегенерация при изменении Content
         elementVm.WhenAnyValue(vm => vm.Content)
@@ -408,7 +427,7 @@ public class MainViewModel : ViewModelBase
             .Where(_ => !elementVm.IsEditing)
             .Throttle(TimeSpan.FromMilliseconds(100))
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe( content =>
+            .Subscribe(async content =>
             {
                 try
                 {
@@ -437,8 +456,6 @@ public class MainViewModel : ViewModelBase
                 imageControl.Width = elementVm.Width;
                 imageControl.Height = elementVm.Height;
             });
-
-        return elementVm;
     }
 
     #endregion
@@ -452,7 +469,7 @@ public class MainViewModel : ViewModelBase
     {
         var pos = e.GetPosition(_mainWindow.LabelCanvas);
         var hitControl = _mainWindow.LabelCanvas.InputHitTest(pos) as Control;
-        Control? actualElement = FindParentControlInCanvas(hitControl);
+        var actualElement = FindParentControlInCanvas(hitControl);
 
         if (actualElement == null) return;
 
@@ -462,8 +479,7 @@ public class MainViewModel : ViewModelBase
         {
             if (e.ClickCount == 1)
             {
-                _draggedElement = actualElement;
-                _startPoint = pos;
+                _elementService.BeginDrag(actualElement, pos.X, pos.Y);
                 e.Pointer.Capture(_mainWindow.LabelCanvas);
                 e.Handled = true;
 
@@ -508,25 +524,8 @@ public class MainViewModel : ViewModelBase
     /// </summary>
     private void HandlePointerMoved(object sender, PointerEventArgs e)
     {
-        if (_draggedElement == null) return;
-
         var pos = e.GetPosition(_mainWindow.LabelCanvas);
-        var delta = pos - _startPoint;
-
-        var left = Canvas.GetLeft(_draggedElement) + delta.X;
-        var top = Canvas.GetTop(_draggedElement) + delta.Y;
-
-        Canvas.SetLeft(_draggedElement, left);
-        Canvas.SetTop(_draggedElement, top);
-
-        var vm = Elements.FirstOrDefault(x => x.Control == _draggedElement);
-        if (vm != null)
-        {
-            vm.X = left;
-            vm.Y = top;
-        }
-
-        _startPoint = pos;
+        _elementService.DragTo(pos.X, pos.Y);
     }
 
     /// <summary>
@@ -534,8 +533,8 @@ public class MainViewModel : ViewModelBase
     /// </summary>
     private void HandlePointerReleased(object sender, PointerReleasedEventArgs e)
     {
+        _elementService.EndDrag();
         e.Pointer.Capture(null);
-        _draggedElement = null;
     }
 
     #endregion
@@ -548,16 +547,7 @@ public class MainViewModel : ViewModelBase
     /// <param name="element">Элемент для удаления.</param>
     private void RemoveElement(ElementViewModel element)
     {
-        if (_mainWindow.LabelCanvas.Children.Contains(element.Control))
-        {
-            _mainWindow.LabelCanvas.Children.Remove(element.Control);
-            Elements.Remove(element);
-
-            if (CurrentElement == element)
-            {
-                CurrentElement = null;
-            }
-        }
+        _elementService.RemoveElement(element, _mainWindow.LabelCanvas);
     }
 
     #endregion
