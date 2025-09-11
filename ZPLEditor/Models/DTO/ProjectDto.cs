@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ZPLEditor.Models.DTO
+namespace MarkEditor.Models.DTO
 {
     public class ProjectDto
     {

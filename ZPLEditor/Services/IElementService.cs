@@ -1,9 +1,9 @@
 ﻿using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using Avalonia.Controls;
-using ZPLEditor.ViewModels;
+using MarkEditor.ViewModels;
 
-namespace ZPLEditor.Services;
+namespace MarkEditor.Services;
 
 /// <summary>
 /// Сервис для управления элементами на холсте.

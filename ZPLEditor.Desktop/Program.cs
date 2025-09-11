@@ -3,7 +3,7 @@
 using Avalonia;
 using Avalonia.ReactiveUI;
 
-namespace ZPLEditor.Desktop;
+namespace MarkEditor.Desktop;
 
 class Program
 {

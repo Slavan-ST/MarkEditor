@@ -23,11 +23,11 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using System.Xml.Linq;
-using ZPLEditor.Services;
-using ZPLEditor.Utils;
-using ZPLEditor.Views;
+using MarkEditor.Services;
+using MarkEditor.Utils;
+using MarkEditor.Views;
 
-namespace ZPLEditor.ViewModels;
+namespace MarkEditor.ViewModels;
 
 /// <summary>
 /// Основная ViewModel для редактора ZPL-этикеток.

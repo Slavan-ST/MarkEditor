@@ -2,10 +2,10 @@
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 
-using ZPLEditor.ViewModels;
-using ZPLEditor.Views;
+using MarkEditor.ViewModels;
+using MarkEditor.Views;
 
-namespace ZPLEditor;
+namespace MarkEditor;
 
 public partial class App : Avalonia.Application
 {

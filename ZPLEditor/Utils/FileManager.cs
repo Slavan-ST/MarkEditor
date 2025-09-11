@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace ZPLEditor.Utils
+namespace MarkEditor.Utils
 {
     public static class FileManager
     {

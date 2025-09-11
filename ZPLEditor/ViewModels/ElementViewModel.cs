@@ -10,9 +10,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
-using ZPLEditor.Utils;
+using MarkEditor.Utils;
 
-namespace ZPLEditor.ViewModels;
+namespace MarkEditor.ViewModels;
 
 /// <summary>
 /// Типы элементов, которые могут быть добавлены на холст.

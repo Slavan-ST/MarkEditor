@@ -8,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ZPLEditor.Utils
+namespace MarkEditor.Utils
 {
     public static class CanvasExporter
     {

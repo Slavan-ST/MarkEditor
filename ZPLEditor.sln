@@ -1,11 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36408.4 d17.14
+VisualStudioVersion = 17.14.36408.4
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZPLEditor", "ZPLEditor\ZPLEditor.csproj", "{F70642B8-5D99-4DD6-A276-FB2A9204A8E4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MarkEditor", "ZPLEditor\MarkEditor.csproj", "{F70642B8-5D99-4DD6-A276-FB2A9204A8E4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZPLEditor.Desktop", "ZPLEditor.Desktop\ZPLEditor.Desktop.csproj", "{59E93740-DED8-F2FC-FA65-A990C8C52874}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MarkEditor.Desktop", "ZPLEditor.Desktop\MarkEditor.Desktop.csproj", "{59E93740-DED8-F2FC-FA65-A990C8C52874}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "Tests\Tests.csproj", "{A293B471-2703-45F4-BD05-DBA3E1CEE6EB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrintServer", "PrintServer\PrintServer.csproj", "{F3358E14-9838-482A-ACC8-4E5B17DEDA0E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +25,14 @@ Global
 		{59E93740-DED8-F2FC-FA65-A990C8C52874}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{59E93740-DED8-F2FC-FA65-A990C8C52874}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{59E93740-DED8-F2FC-FA65-A990C8C52874}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A293B471-2703-45F4-BD05-DBA3E1CEE6EB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A293B471-2703-45F4-BD05-DBA3E1CEE6EB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A293B471-2703-45F4-BD05-DBA3E1CEE6EB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A293B471-2703-45F4-BD05-DBA3E1CEE6EB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F3358E14-9838-482A-ACC8-4E5B17DEDA0E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F3358E14-9838-482A-ACC8-4E5B17DEDA0E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F3358E14-9838-482A-ACC8-4E5B17DEDA0E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F3358E14-9838-482A-ACC8-4E5B17DEDA0E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

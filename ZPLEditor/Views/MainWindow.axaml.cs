@@ -1,7 +1,7 @@
 ﻿using Avalonia;
 using Avalonia.Controls;
 
-namespace ZPLEditor.Views;
+namespace MarkEditor.Views;
 
 public partial class MainWindow : Window
 {

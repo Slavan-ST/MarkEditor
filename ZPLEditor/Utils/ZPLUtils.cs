@@ -15,9 +15,9 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
-using ZPLEditor.ViewModels;
+using MarkEditor.ViewModels;
 
-namespace ZPLEditor.Utils;
+namespace MarkEditor.Utils;
 
 /// <summary>
 /// Вспомогательный класс для генерации ZPL-кода из элементов интерфейса и отправки его на принтер.

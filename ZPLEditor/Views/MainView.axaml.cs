@@ -3,9 +3,9 @@ using Avalonia.Input;
 using BinaryKits.Zpl.Viewer;
 using System.Drawing;
 using System.IO;
-using ZPLEditor.ViewModels;
+using MarkEditor.ViewModels;
 
-namespace ZPLEditor.Views;
+namespace MarkEditor.Views;
 
 public partial class MainView : UserControl
 {

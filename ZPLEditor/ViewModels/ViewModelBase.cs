@@ -1,6 +1,6 @@
 ﻿using ReactiveUI;
 
-namespace ZPLEditor.ViewModels;
+namespace MarkEditor.ViewModels;
 
 public class ViewModelBase : ReactiveObject
 {

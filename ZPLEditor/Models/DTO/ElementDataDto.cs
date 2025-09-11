@@ -1,9 +1,9 @@
 ﻿using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using System.IO;
-using ZPLEditor.ViewModels;
+using MarkEditor.ViewModels;
 
-namespace ZPLEditor.Models.DTO
+namespace MarkEditor.Models.DTO
 {
     /// <summary>
     /// DTO (Data Transfer Object) для сериализации и передачи данных элемента.

@@ -4,9 +4,9 @@ using ReactiveUI;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
-using ZPLEditor.ViewModels;
+using MarkEditor.ViewModels;
 
-namespace ZPLEditor.Services
+namespace MarkEditor.Services
 {
     public class ElementService : IElementService
     {

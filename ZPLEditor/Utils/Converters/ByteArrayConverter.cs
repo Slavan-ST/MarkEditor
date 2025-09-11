@@ -6,7 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
-namespace ZPLEditor.Utils.Converters
+namespace MarkEditor.Utils.Converters
 {
     public class ByteArrayConverter : JsonConverter<byte[]>
     {

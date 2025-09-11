@@ -9,11 +9,11 @@ using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Text.Json;
-using ZPLEditor.Models.DTO;
-using ZPLEditor.Utils.Converters;
-using ZPLEditor.ViewModels;
+using MarkEditor.Models.DTO;
+using MarkEditor.Utils.Converters;
+using MarkEditor.ViewModels;
 
-namespace ZPLEditor.Utils
+namespace MarkEditor.Utils
 {
     /// <summary>
     /// Утилита для сериализации и десериализации проекта редактора этикеток.

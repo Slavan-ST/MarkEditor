@@ -7,7 +7,7 @@ using ZXing;
 using ZXing.Common;
 using ZXing.SkiaSharp.Rendering;
 
-namespace ZPLEditor.Utils
+namespace MarkEditor.Utils
 {
     public static class BarcodeGenerator
     {
