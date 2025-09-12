@@ -167,7 +167,11 @@ public class MainViewModel : ViewModelBase
     {
         try
         {
-            var window = (Window)_mainWindow.GetVisualRoot();
+            var window = (Window?)_mainWindow.GetVisualRoot();
+            if (window is null) 
+            { 
+                return; 
+            }
             var filePath = await FileManager.SaveJsonFileAsync(window);
             if (!string.IsNullOrEmpty(filePath))
             {
@@ -187,7 +191,11 @@ public class MainViewModel : ViewModelBase
     {
         try
         {
-            var window = (Window)_mainWindow.GetVisualRoot();
+            var window = (Window?)_mainWindow.GetVisualRoot();
+            if (window is null)
+            {
+                return;
+            }
             var filePath = await FileManager.OpenJsonFileAsync(window);
             if (!string.IsNullOrEmpty(filePath))
             {
@@ -230,16 +238,16 @@ public class MainViewModel : ViewModelBase
         _elementService.AddElement(elementVm, textBox, _mainWindow.LabelCanvas);
 
         // Обработчики редактирования
-        void OnTextBoxLostFocus(object sender, RoutedEventArgs e)
+        void OnTextBoxLostFocus(object? sender, RoutedEventArgs e)
         {
             if (sender is TextBox tb && elementVm.IsEditing)
             {
                 elementVm.IsEditing = false;
-                elementVm.Content = tb.Text;
+                elementVm.Content = tb.Text ?? "";
             }
         }
 
-        void OnTextBoxKeyDown(object sender, KeyEventArgs e)
+        void OnTextBoxKeyDown(object? sender, KeyEventArgs e)
         {
             if (e.Key is Key.Enter or Key.Escape)
             {
@@ -280,7 +288,11 @@ public class MainViewModel : ViewModelBase
     /// </summary>
     private async Task AddImageAsync()
     {
-        var window = (Window)_mainWindow.GetVisualRoot();
+        var window = (Window?)_mainWindow.GetVisualRoot();
+        if (window is null)
+        {
+            return;
+        }
         var filePath = await FileManager.OpenImageFileAsync(window);
         if (string.IsNullOrEmpty(filePath)) return;
 
@@ -427,7 +439,7 @@ public class MainViewModel : ViewModelBase
             .Where(_ => !elementVm.IsEditing)
             .Throttle(TimeSpan.FromMilliseconds(100))
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(async content =>
+            .Subscribe(content =>
             {
                 try
                 {
@@ -465,7 +477,7 @@ public class MainViewModel : ViewModelBase
     /// <summary>
     /// Обработчик нажатия на холст — определяет, по какому элементу кликнули.
     /// </summary>
-    private void Canvas_PointerPressed(object sender, PointerPressedEventArgs e)
+    private void Canvas_PointerPressed(object ?sender, PointerPressedEventArgs e)
     {
         var pos = e.GetPosition(_mainWindow.LabelCanvas);
         var hitControl = _mainWindow.LabelCanvas.InputHitTest(pos) as Control;
@@ -522,7 +534,7 @@ public class MainViewModel : ViewModelBase
     /// <summary>
     /// Обработка движения мыши при перетаскивании.
     /// </summary>
-    private void HandlePointerMoved(object sender, PointerEventArgs e)
+    private void HandlePointerMoved(object? sender, PointerEventArgs e)
     {
         var pos = e.GetPosition(_mainWindow.LabelCanvas);
         _elementService.DragTo(pos.X, pos.Y);
@@ -531,7 +543,7 @@ public class MainViewModel : ViewModelBase
     /// <summary>
     /// Завершение перетаскивания — освобождение захвата указателя.
     /// </summary>
-    private void HandlePointerReleased(object sender, PointerReleasedEventArgs e)
+    private void HandlePointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         _elementService.EndDrag();
         e.Pointer.Capture(null);
@@ -548,6 +560,7 @@ public class MainViewModel : ViewModelBase
     private void RemoveElement(ElementViewModel element)
     {
         _elementService.RemoveElement(element, _mainWindow.LabelCanvas);
+        CurrentElement = null;
     }
 
     #endregion

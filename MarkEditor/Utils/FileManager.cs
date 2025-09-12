@@ -1,6 +1,8 @@
 ﻿using Avalonia.Controls;
+using Avalonia.Platform.Storage;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace MarkEditor.Utils
@@ -10,109 +12,136 @@ namespace MarkEditor.Utils
         /// <summary>
         /// Открывает диалог выбора одного файла с указанными фильтрами.
         /// </summary>
-        /// <param name="window">Родительское окно</param>
-        /// <param name="filters">Фильтры файлов</param>
-        /// <param name="title">Заголовок диалога</param>
-        /// <returns>Путь к выбранному файлу или null, если выбор отменён</returns>
-        private static async Task<string?> OpenFileAsync(Window window, IEnumerable<FileDialogFilter> filters, string title)
+        private static async Task<string?> OpenFileAsync(Window window, FilePickerFileType[] filters, string title)
         {
-            var dialog = new OpenFileDialog
+            var topLevel = TopLevel.GetTopLevel(window);
+            if (topLevel?.StorageProvider is not { } storageProvider)
+                return null;
+
+            var result = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
                 Title = title,
-                Filters = new List<FileDialogFilter>(filters),
-                AllowMultiple = false
-            };
+                AllowMultiple = false,
+                FileTypeFilter = filters
+            });
 
-            var result = await dialog.ShowAsync(window);
-            return result?.Length > 0 ? result[0] : null;
+            return result.FirstOrDefault()?.Path?.LocalPath;
         }
 
         /// <summary>
         /// Открывает диалог сохранения файла с указанными фильтрами.
         /// </summary>
-        /// <param name="window">Родительское окно</param>
-        /// <param name="filters">Фильтры файлов</param>
-        /// <param name="title">Заголовок диалога</param>
-        /// <param name="defaultExtension">Расширение по умолчанию</param>
-        /// <returns>Путь к выбранному файлу для сохранения или null, если диалог отменён</returns>
-        private static async Task<string?> SaveFileAsync(Window window, IEnumerable<FileDialogFilter> filters, string title, string? defaultExtension = null)
+        private static async Task<string?> SaveFileAsync(Window window, FilePickerFileType[] filters, string title, string? defaultExtension = null)
         {
-            var dialog = new SaveFileDialog
+            var topLevel = TopLevel.GetTopLevel(window);
+            if (topLevel?.StorageProvider is not { } storageProvider)
+                return null;
+
+            var options = new FilePickerSaveOptions
             {
                 Title = title,
-                Filters = new List<FileDialogFilter>(filters),
-                DefaultExtension = defaultExtension
+                FileTypeChoices = filters,
+                DefaultExtension = defaultExtension,
+                SuggestedFileName = "untitled" // можно настроить по необходимости
             };
 
-            var result = await dialog.ShowAsync(window);
-            return result; // Может быть null, если пользователь отменил диалог
+            var result = await storageProvider.SaveFilePickerAsync(options);
+            return result?.Path?.LocalPath;
         }
 
         /// <summary>
         /// Открывает диалог выбора изображения.
         /// </summary>
-        /// <param name="window">Родительское окно</param>
-        /// <returns>Путь к выбранному изображению или null</returns>
         public static async Task<string?> OpenImageFileAsync(Window window)
         {
-            var filters = new[]
+            var imageFilter = new FilePickerFileType("Изображения")
             {
-                new FileDialogFilter { Name = "Изображения", Extensions = { "png", "jpg", "jpeg", "bmp", "gif" } },
-                new FileDialogFilter { Name = "Все файлы", Extensions = { "*" } }
+                Patterns = ["*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif"],
+                AppleUniformTypeIdentifiers = ["public.image"],
+                MimeTypes = ["image/*"]
             };
 
-            return await OpenFileAsync(window, filters, "Выберите изображение");
+            var allFilter = new FilePickerFileType("Все файлы")
+            {
+                Patterns = ["*"]
+            };
+
+            return await OpenFileAsync(window, [imageFilter, allFilter], "Выберите изображение");
         }
 
         /// <summary>
         /// Открывает диалог выбора JSON-файла.
         /// </summary>
-        /// <param name="window">Родительское окно</param>
-        /// <returns>Путь к выбранному JSON-файлу или null</returns>
         public static async Task<string?> OpenJsonFileAsync(Window window)
         {
-            var filters = new[]
+            var jsonFilter = new FilePickerFileType("JSON-файлы")
             {
-                new FileDialogFilter { Name = "JSON-файлы", Extensions = { "json" } },
-                new FileDialogFilter { Name = "Все файлы", Extensions = { "*" } }
+                Patterns = ["*.json"],
+                MimeTypes = ["application/json"]
             };
 
-            return await OpenFileAsync(window, filters, "Выберите проект");
+            var allFilter = new FilePickerFileType("Все файлы")
+            {
+                Patterns = ["*"]
+            };
+
+            return await OpenFileAsync(window, [jsonFilter, allFilter], "Выберите проект");
         }
 
         /// <summary>
         /// Открывает диалог сохранения изображения.
         /// </summary>
-        /// <param name="window">Родительское окно</param>
-        /// <returns>Путь для сохранения изображения или null, если отменено</returns>
         public static async Task<string?> SaveImageFileAsync(Window window)
         {
-            var filters = new[]
+            var pngFilter = new FilePickerFileType("PNG изображение")
             {
-                new FileDialogFilter { Name = "PNG изображение", Extensions = { "png" } },
-                new FileDialogFilter { Name = "JPEG изображение", Extensions = { "jpg", "jpeg" } },
-                new FileDialogFilter { Name = "BMP изображение", Extensions = { "bmp" } },
-                new FileDialogFilter { Name = "GIF изображение", Extensions = { "gif" } },
-                new FileDialogFilter { Name = "Все файлы", Extensions = { "*" } }
+                Patterns = ["*.png"],
+                MimeTypes = ["image/png"]
             };
 
-            return await SaveFileAsync(window, filters, "Сохранить изображение", "png");
+            var jpegFilter = new FilePickerFileType("JPEG изображение")
+            {
+                Patterns = ["*.jpg", "*.jpeg"],
+                MimeTypes = ["image/jpeg"]
+            };
+
+            var bmpFilter = new FilePickerFileType("BMP изображение")
+            {
+                Patterns = ["*.bmp"],
+                MimeTypes = ["image/bmp"]
+            };
+
+            var gifFilter = new FilePickerFileType("GIF изображение")
+            {
+                Patterns = ["*.gif"],
+                MimeTypes = ["image/gif"]
+            };
+
+            var allFilter = new FilePickerFileType("Все файлы")
+            {
+                Patterns = ["*"]
+            };
+
+            return await SaveFileAsync(window, [pngFilter, jpegFilter, bmpFilter, gifFilter, allFilter], "Сохранить изображение", "png");
         }
 
         /// <summary>
         /// Открывает диалог сохранения JSON-файла.
         /// </summary>
-        /// <param name="window">Родительское окно</param>
-        /// <returns>Путь для сохранения JSON-файла или null, если отменено</returns>
         public static async Task<string?> SaveJsonFileAsync(Window window)
         {
-            var filters = new[]
+            var jsonFilter = new FilePickerFileType("JSON-файлы")
             {
-                new FileDialogFilter { Name = "JSON-файлы", Extensions = { "json" } },
-                new FileDialogFilter { Name = "Все файлы", Extensions = { "*" } }
+                Patterns = ["*.json"],
+                MimeTypes = ["application/json"]
             };
 
-            return await SaveFileAsync(window, filters, "Сохранить проект", "json");
+            var allFilter = new FilePickerFileType("Все файлы")
+            {
+                Patterns = ["*"]
+            };
+
+            return await SaveFileAsync(window, [jsonFilter, allFilter], "Сохранить проект", "json");
         }
     }
 }
